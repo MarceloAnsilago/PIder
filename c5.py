@@ -102,10 +102,12 @@ data_indice_desempenho = {
 
 def extrair_ano(data):
     try:
+        return data.year
+    except AttributeError:
         return pd.to_datetime(data).year
-    except:
-        return None
+    
 
+    
 def salario_base(ano, nivel_educacao):
     ano_atual = datetime.now().year
     anos_diferenca = ano_atual - ano
@@ -339,12 +341,20 @@ elif selected == "Mostrar Dados do Quadro":
 
 
 elif selected == "Simular PCCR-FOLHA":
-     # Função para calcular o grau compatível
- # Função para calcular o grau compatível
+ # Função para converter valores para número
+    def converter_para_numero(valor):
+        try:
+            return float(valor)
+        except ValueError:
+            return 0.0
+
+    # Função para formatar DataFrame
     def formatar_dataframe(df):
-            df['Total_Vencimento'] = df['Total_Vencimento'].apply(lambda x: format_currency(x, 'BRL', locale='pt_BR') if pd.notnull(x) else "N/A")
-            df['Total_Adicional_Desempenho'] = df['Total_Adicional_Desempenho'].apply(lambda x: format_currency(x, 'BRL', locale='pt_BR') if pd.notnull(x) else "N/A")
-            return df
+        df['Total_Vencimento'] = df['Total_Vencimento'].apply(lambda x: format_currency(x, 'BRL', locale='pt_BR') if pd.notnull(x) else "N/A")
+        df['Total_Adicional_Desempenho'] = df['Total_Adicional_Desempenho'].apply(lambda x: format_currency(x, 'BRL', locale='pt_BR') if pd.notnull(x) else "N/A")
+        return df
+
+    # Função para calcular o grau compatível
     def calcular_grau(ano_final):
         graus_por_nivel = {
             0: "A",
@@ -364,6 +374,7 @@ elif selected == "Simular PCCR-FOLHA":
 
         return graus_por_nivel[niveis_subidos]
 
+    # Função para determinar o nível
     def determinar_nivel(ano_final, nivel_atual, ano_atual):
         if ano_final == ano_atual:
             return nivel_atual, calcular_grau(ano_final)
@@ -378,6 +389,7 @@ elif selected == "Simular PCCR-FOLHA":
 
         return novo_nivel, calcular_grau(ano_final)
 
+    # Função para obter vencimento
     def obter_vencimento(dataframe_vencimentos, nivel, grau):
         nivel_str = str(nivel)
         if grau not in dataframe_vencimentos.columns:
@@ -387,18 +399,18 @@ elif selected == "Simular PCCR-FOLHA":
             return vencimento[0]
         return 0.0
 
-    # Marcação: Carregar Dados
+    # Carregar Dados
     try:
         df_servidores = pd.read_excel('dados_completos.xlsx')
     except Exception as e:
         st.error(f"Erro ao carregar o arquivo: {e}")
     else:
-        # Marcação: Filtragem de Dados
+        # Filtragem de Dados
         df_filtrado = df_servidores[df_servidores['Nível'].notna() & (df_servidores['Nível'] != 0)]
         df_filtrado['Ano'] = df_filtrado['Data de admissão'].apply(extrair_ano)
         df_filtrado['Ano'] = df_filtrado['Ano'].astype(str)
 
-        # Marcação: Definir Cargos
+        # Definir Cargos
         cargos_fundamental = [
             'Idaron - Agente de Transporte Fluvial',
             'Idaron - Agente de Dilig. e Transporte',
@@ -412,7 +424,7 @@ elif selected == "Simular PCCR-FOLHA":
         df_assistentes_fiscais = df_filtrado[df_filtrado['Cargo/Função/Emprego'] == cargo_fiscal]
         df_nivel_superior = df_filtrado[~df_filtrado['Cargo/Função/Emprego'].isin(cargos_fundamental + [cargo_gestao, cargo_fiscal])]
 
-        # Marcação: Função para Processar DataFrame
+        # Função para Processar DataFrame
         def processar_dataframe(df):
             df['VENCIMENTO'] = df['VENCIMENTO'].apply(converter_para_numero)
             df['Idaron - Adicional de Desempenho'] = df['Idaron - Adicional de Desempenho'].apply(converter_para_numero)
@@ -429,7 +441,7 @@ elif selected == "Simular PCCR-FOLHA":
             df_agrupado = formatar_dataframe(df_agrupado)
             return df_agrupado
 
-        # Marcação: Função para Exibir Totais
+        # Função para Exibir Totais
         def exibir_totais(df):
             total_servidores = df['Quantidade_Servidores'].sum()
             total_vencimento = df['Total_Vencimento'].apply(converter_para_numero).sum()
@@ -439,7 +451,7 @@ elif selected == "Simular PCCR-FOLHA":
             st.write(f"Total Salário Base: {format_currency(total_vencimento, 'BRL', locale='pt_BR')}")
             st.write(f"Total Adicional de Desempenho: {format_currency(total_desempenho, 'BRL', locale='pt_BR')}")
 
-        # Marcação: Expanders para Exibição dos DataFrames
+        # Expanders para Exibição dos DataFrames
         with st.expander("Servidores de Nível Fundamental"):
             df_fundamental = processar_dataframe(df_nivel_fundamental)
             st.dataframe(df_fundamental)
@@ -460,7 +472,7 @@ elif selected == "Simular PCCR-FOLHA":
             st.dataframe(df_superior)
             exibir_totais(df_superior)
 
-        # Marcação: Entradas de Simulação
+        # Entradas de Simulação
         col1, col2, col3, col4 = st.columns(4)
         graus_nivel_superior = {
             "FORMAÇÃO REQUISITO PARA INGRESSO": "A",
@@ -528,7 +540,7 @@ elif selected == "Simular PCCR-FOLHA":
                 grau_superior = graus_nivel_superior[tipo_salario_superior]
                 st.write(f"Grau: {grau_superior}")
 
-        # Marcação: Entrada de UPF e Ano Final
+        # Entrada de UPF e Ano Final
         col1, col2 = st.columns(2)
 
         with col1:
@@ -587,7 +599,7 @@ elif selected == "Simular PCCR-FOLHA":
                 'grau_superior': grau_superior if simular_superior else ''
             })
 
-        # Marcação: Exibir Simulações e Botão de Exclusão
+        # Exibir Simulações e Botão de Exclusão
         simulacoes_para_remover = []
         for simulacao in st.session_state.simulacoes:
             st.markdown(f"### {simulacao['titulo_simulacao']}")
@@ -606,6 +618,7 @@ elif selected == "Simular PCCR-FOLHA":
                 # Inicializar df_zerado com valores zerados
                 df_zerado = pd.DataFrame({
                     'Nível': ['0'] * len(df),
+                    'Grau': ['A'] * len(df),
                     'Qtd': [0] * len(df),
                     'Venc': ['R$ 0,00'] * len(df),
                     'Desemp': ['R$ 0,00'] * len(df)
@@ -637,7 +650,8 @@ elif selected == "Simular PCCR-FOLHA":
                             novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, ano_atual)
                             vencimento = obter_vencimento(pd.DataFrame(data_nivel_superior), novo_nivel, novo_grau)
 
-                        df_zerado.at[idx, 'Nível'] = f"{novo_nivel}{novo_grau}"
+                        df_zerado.at[idx, 'Nível'] = f"{novo_nivel}"
+                        df_zerado.at[idx, 'Grau'] = f"{novo_grau}"
                         df_zerado.at[idx, 'Venc'] = format_currency(vencimento, 'BRL', locale='pt_BR') if vencimento != 0 else "R$ 0,00"
 
                 df_zerado_html = df_zerado.to_html(index=False, justify="center", border=0)
