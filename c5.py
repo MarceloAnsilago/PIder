@@ -443,16 +443,19 @@ elif selected == "Simular PCCR-FOLHA":
             df_agrupado['Total_Vencimento'] = df_agrupado['Total_Vencimento'].apply(formatar_valor)
             df_agrupado['Total_Adicional_Desempenho'] = df_agrupado['Total_Adicional_Desempenho'].apply(formatar_valor)
             return df_agrupado
-        # Marcação: Função para Exibir Totais
+
+        # Função para exibir os totais
         def exibir_totais(df):
             total_servidores = df['Quantidade_Servidores'].sum()
             total_vencimento = df['Total_Vencimento'].apply(converter_para_numero).sum()
             total_desempenho = df['Total_Adicional_Desempenho'].apply(converter_para_numero).sum()
 
             st.write(f"Total de Servidores: {total_servidores}")
-            st.write(f"Total Salário Base: {locale.currency(total_vencimento, grouping=True)}")
-            st.write(f"Total Adicional de Desempenho: {locale.currency(total_desempenho, grouping=True)}")
+            st.write(f"Total Salário Base: {formatar_valor(total_vencimento)}")
+            st.write(f"Total Adicional de Desempenho: {formatar_valor(total_desempenho)}")
 
+      
+      
         # Marcação: Expanders para Exibição dos DataFrames
         with st.expander("Servidores de Nível Fundamental"):
             df_fundamental = processar_dataframe(df_nivel_fundamental)
