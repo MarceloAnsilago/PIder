@@ -418,6 +418,14 @@ elif selected == "Simular PCCR-FOLHA":
         df_nivel_superior = df_filtrado[~df_filtrado['Cargo/Função/Emprego'].isin(cargos_fundamental + [cargo_gestao, cargo_fiscal])]
 
         # Marcação: Função para Processar DataFrame
+        # Função para formatar valores monetários como strings
+        def formatar_valor(valor):
+            try:
+                return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            except ValueError:
+                return "N/A"
+
+        # Função para processar DataFrame
         def processar_dataframe(df):
             df['VENCIMENTO'] = df['VENCIMENTO'].apply(converter_para_numero)
             df['Idaron - Adicional de Desempenho'] = df['Idaron - Adicional de Desempenho'].apply(converter_para_numero)
@@ -431,14 +439,10 @@ elif selected == "Simular PCCR-FOLHA":
             df_agrupado['Total_Vencimento'] = df_agrupado['Total_Vencimento'].astype(float)
             df_agrupado['Total_Adicional_Desempenho'] = df_agrupado['Total_Adicional_Desempenho'].astype(float)
 
-            def formatar_dataframe(df):
-                df['Total_Vencimento'] = df['Total_Vencimento'].apply(lambda x: locale.currency(x, grouping=True) if pd.notnull(x) else "N/A")
-                df['Total_Adicional_Desempenho'] = df['Total_Adicional_Desempenho'].apply(lambda x: locale.currency(x, grouping=True) if pd.notnull(x) else "N/A")
-                return df
-
-            df_agrupado = formatar_dataframe(df_agrupado)
+            # Aplicar a formatação de valor monetário
+            df_agrupado['Total_Vencimento'] = df_agrupado['Total_Vencimento'].apply(formatar_valor)
+            df_agrupado['Total_Adicional_Desempenho'] = df_agrupado['Total_Adicional_Desempenho'].apply(formatar_valor)
             return df_agrupado
-
         # Marcação: Função para Exibir Totais
         def exibir_totais(df):
             total_servidores = df['Quantidade_Servidores'].sum()
