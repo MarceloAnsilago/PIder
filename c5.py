@@ -10,10 +10,19 @@ import uuid
 # Configurando a localização para o Brasil
 
 
-# try:
-locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
-# except locale.Error:
-#     locale.setlocale(locale.LC_ALL, '')
+# Tenta configurar o locale para diferentes opções
+try:
+    locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
+except locale.Error:
+    try:
+        locale.setlocale(locale.LC_ALL, 'pt_BR')
+    except locale.Error:
+        try:
+            locale.setlocale(locale.LC_ALL, 'Portuguese_Brazil.1252')
+        except locale.Error:
+            # Configuração de fallback caso todas as opções anteriores falhem
+            locale.setlocale(locale.LC_ALL, '')
+
 
 # Configura a página para o modo wide
 st.set_page_config(layout="wide")
