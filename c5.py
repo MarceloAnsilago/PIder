@@ -502,6 +502,16 @@ elif selected == "Simular PCCR-FOLHA":
             "DOUTORADO": "F"
         }
 
+        # Inicialize as variáveis fora do escopo dos checkboxes
+        pontos_medio = 0
+        pontos_gestao = 0
+        pontos_fiscal = 0
+        pontos_superior = 0
+        grau_fundamental = ''
+        grau_gestao = ''
+        grau_fiscal = ''
+        grau_superior = ''
+
         with col1:
             simular_fundamental = st.checkbox("Simular Nível Fundamental")
             if simular_fundamental:
@@ -549,6 +559,8 @@ elif selected == "Simular PCCR-FOLHA":
                 )
                 grau_superior = graus_nivel_superior[tipo_salario_superior]
                 st.write(f"Grau: {grau_superior}")
+
+# A partir daqui, continue com o restante do código normalmente
 
         col1, col2 = st.columns(2)
         with col1:
