@@ -595,26 +595,27 @@ elif selected == "Simular PCCR-FOLHA":
             simulacao_id = str(uuid.uuid4())
 
             st.session_state.simulacoes.append({
-                'titulo_simulacao': titulo_simulacao,
-                'dataframes_processados': dataframes_processados,
-                'simulacao_id': simulacao_id,
-                'checkbox_states': {
-                    'simular_fundamental': simular_fundamental,
-                    'simular_gestao': simular_gestao,
-                    'simular_fiscal': simular_fiscal,
-                    'simular_superior': simular_superior,
-                },
-                'upf_value': upf_value,
-                'ano_final': ano_final,
-                'pontos_medio': pontos_medio if simular_fundamental else 0,
-                'pontos_gestao': pontos_gestao if simular_gestao else 0,
-                'pontos_fiscal': pontos_fiscal if simular_fiscal else 0,
-                'pontos_superior': pontos_superior if simular_superior else 0,
-                'grau_fundamental': grau_fundamental if simular_fundamental else '',
-                'grau_gestao': grau_gestao if simular_gestao else '',
-                'grau_fiscal': grau_fiscal if simular_fiscal else '',
-                'grau_superior': grau_superior if simular_superior else ''
-            })
+            'titulo_simulacao': titulo_simulacao,
+            'dataframes_processados': dataframes_processados,
+            'simulacao_id': simulacao_id,
+            'checkbox_states': {
+                'simular_fundamental': simular_fundamental,
+                'simular_gestao': simular_gestao,
+                'simular_fiscal': simular_fiscal,
+                'simular_superior': simular_superior,
+            },
+            'upf_value': upf_value,
+            'ano_final': ano_final,
+            'pontos_medio': pontos_medio if simular_fundamental else 0,
+            'pontos_gestao': pontos_gestao if simular_gestao else 0,
+            'pontos_fiscal': pontos_fiscal if simular_fiscal else 0,
+            'pontos_superior': pontos_superior if simular_superior else 0,
+            'grau_fundamental': grau_fundamental if simular_fundamental else '',
+            'grau_gestao': grau_gestao if simular_gestao else '',
+            'grau_fiscal': grau_fiscal if simular_fiscal else '',
+            'grau_superior': grau_superior if simular_superior else ''
+        })
+
 
         simulacoes_para_remover = []
         for simulacao in st.session_state.simulacoes:
