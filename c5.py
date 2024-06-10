@@ -863,7 +863,7 @@ elif selected == "Tabelas":
 
     st.markdown("---")
     df_fundamental = pd.DataFrame(data_nivel_fundamental)
-    html_table_fundamental = df_fundamental.to_html(index=False)
+    html_table = df_fundamental.to_html(index=False)
     st.markdown(f"### Tabela III - Cargos das Carreiras de Nível Fundamental")
     st.markdown(html_table, unsafe_allow_html=True)
 
