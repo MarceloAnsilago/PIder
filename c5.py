@@ -345,9 +345,34 @@ elif selected == "Mostrar Dados do Quadro":
 
 
 
-elif selected == "Simular PCCR-FOLHA":
-     # Função para calcular o grau compatível
 
+
+
+
+
+
+
+
+
+
+
+
+       
+elif selected == "Simular PCCR-FOLHA":
+    # Definição dos dataframes para desempenho
+    data_adic_desempenho = {
+        "GRAU": ["A", "B", "C", "D", "E", "F"],
+        "VALOR DO PONTO DO ADIC DE DESEMPENHO": [0.029, 0.031, 0.033, 0.038, 0.046, 0.059]
+    }
+    df_adic_desempenho = pd.DataFrame(data_adic_desempenho)
+
+    data_indice_desempenho = {
+        "NIVEL": ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX"],
+        "ÍNDICE DE ADICIONAL DE DESEMPENHO": [1, 1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 1.35, 1.4, 1.45, 1.5, 1.55, 1.6, 1.65, 1.7, 1.75, 1.8, 1.85, 1.9, 2]
+    }
+    df_indice_desempenho = pd.DataFrame(data_indice_desempenho)
+
+    # Função para calcular o grau compatível
     def calcular_grau(ano_final):
         graus_por_nivel = {
             0: "A",
@@ -380,17 +405,41 @@ elif selected == "Simular PCCR-FOLHA":
         novo_nivel = nivel_atual + niveis_adicionais
 
         return novo_nivel, calcular_grau(ano_final)
+    
+    def obter_vencimento(dataframe_vencimentos, nivel, grau, nivel_educacao):
+        if nivel_educacao == "Nivel superior":
+            cursos = {
+                "A": "FORMAÇÃO REQUISITO PARA INGRESSO",
+                "B": "CAPACITAÇÃO",
+                "C": "ESPECIALIZAÇÃO",
+                "D": "GRADUAÇÃO POSTERIOR RELACIONADA ÁS ATRIBUIÇÕES DO CARGO",
+                "E": "MESTRADO",
+                "F": "DOUTORADO"
+            }
+        else:
+            cursos = {
+                "A": "FORMAÇÃO REQUISITO PARA INGRESSO",
+                "B": "CAPACITAÇÃO",
+                "C": "GRADUAÇÃO",
+                "D": "ESPECIALIZAÇÃO",
+                "E": "MESTRADO",
+                "F": "DOUTORADO"
+            }
 
-
-    def obter_vencimento(dataframe_vencimentos, nivel, grau):
-        nivel_str = str(nivel)
-        if grau not in dataframe_vencimentos.columns:
+        if grau not in cursos:
             return 0.0
-        vencimento = dataframe_vencimentos.loc[dataframe_vencimentos['NIVEL'] == nivel_str, grau].values
+
+        curso = cursos[grau]
+        vencimento = dataframe_vencimentos.loc[dataframe_vencimentos['NIVEL'] == nivel, curso].values
         if len(vencimento) > 0:
             return vencimento[0]
         return 0.0
 
+    def desempenho(grau, nivel_roman, upf_value, pontos):
+        valor_adic_desempenho = df_adic_desempenho.loc[df_adic_desempenho['GRAU'] == grau, 'VALOR DO PONTO DO ADIC DE DESEMPENHO'].values[0]
+        indice_desempenho = df_indice_desempenho.loc[df_indice_desempenho['NIVEL'] == nivel_roman, 'ÍNDICE DE ADICIONAL DE DESEMPENHO'].values[0]
+        valor_desempenho = upf_value * valor_adic_desempenho * indice_desempenho * pontos
+        return valor_desempenho
 
     # Marcação: Carregar Dados
     try:
@@ -454,8 +503,6 @@ elif selected == "Simular PCCR-FOLHA":
             st.write(f"Total Salário Base: {formatar_valor(total_vencimento)}")
             st.write(f"Total Adicional de Desempenho: {formatar_valor(total_desempenho)}")
 
-      
-      
         # Marcação: Expanders para Exibição dos DataFrames
         with st.expander("Servidores de Nível Fundamental"):
             df_fundamental = processar_dataframe(df_nivel_fundamental)
@@ -577,7 +624,6 @@ elif selected == "Simular PCCR-FOLHA":
                     'Total_Venc': 'Venc',
                     'Total_Adicional_Desempenho': 'Desemp'
                 }, inplace=True)
-
             numero_simulacao = len(st.session_state.simulacoes) + 1
             titulo_simulacao = f"Simulação {numero_simulacao}: {descricao_opcional}" if descricao_opcional else f"Simulação {numero_simulacao}"
             simulacao_id = str(uuid.uuid4())
@@ -604,7 +650,6 @@ elif selected == "Simular PCCR-FOLHA":
                 'grau_superior': grau_superior if simular_superior else ''
             })
 
-       
         # Marcação: Exibir Simulações e Botão de Exclusão
         simulacoes_para_remover = []
         for simulacao in st.session_state.simulacoes:
@@ -621,20 +666,19 @@ elif selected == "Simular PCCR-FOLHA":
                 grau_fiscal = simulacao['grau_fiscal']
                 grau_superior = simulacao['grau_superior']
 
-                # Inicializar df_zerado com valores zerados
-                df_zerado = pd.DataFrame({
-                    'Nível': ['0'] * len(df),
-                    'Grau': [''] * len(df),
-                    'Qtd': [0] * len(df),
-                    'Venc': ['R$ 0,00'] * len(df),
-                    'Desemp': ['R$ 0,00'] * len(df)
-                })
-
-                # Preencher df_zerado apenas se o checkbox correspondente estiver marcado
+                # Apenas gerar a segunda tabela se o checkbox estiver marcado
                 if (nome == 'Nível Fundamental' and checkbox_states['simular_fundamental']) or \
-                (nome == 'Assistentes de Gestão' and checkbox_states['simular_gestao']) or \
-                (nome == 'Assistentes Fiscais' and checkbox_states['simular_fiscal']) or \
-                (nome == 'Cargos de Nível Superior' and checkbox_states['simular_superior']):
+                   (nome == 'Assistentes de Gestão' and checkbox_states['simular_gestao']) or \
+                   (nome == 'Assistentes Fiscais' and checkbox_states['simular_fiscal']) or \
+                   (nome == 'Cargos de Nível Superior' and checkbox_states['simular_superior']):
+
+                    df_zerado = pd.DataFrame({
+                        'Nível': [''] * len(df),
+                        'Grau': [''] * len(df),
+                        'Venc-Unitário': [''] * len(df),
+                        'Venc-Total': [''] * len(df),
+                        'Desemp': [''] * len(df)
+                    })
 
                     for idx, row in df.iterrows():
                         nivel_atual_str = row['Nível']
@@ -645,29 +689,43 @@ elif selected == "Simular PCCR-FOLHA":
 
                         if nome == 'Nível Fundamental':
                             novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, ano_atual)
-                            vencimento = obter_vencimento(pd.DataFrame(data_nivel_fundamental), novo_nivel, novo_grau)
+                            vencimento = obter_vencimento(pd.DataFrame(data_nivel_fundamental), novo_nivel, novo_grau, "Nivel fundamental")
+                            pontos = pontos_medio
                         elif nome == 'Assistentes de Gestão':
                             novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, ano_atual)
-                            vencimento = obter_vencimento(pd.DataFrame(data_nivel_medio), novo_nivel, novo_grau)
+                            vencimento = obter_vencimento(pd.DataFrame(data_nivel_medio), novo_nivel, novo_grau, "Nivel medio")
+                            pontos = pontos_gestao
                         elif nome == 'Assistentes Fiscais':
                             novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, ano_atual)
-                            vencimento = obter_vencimento(pd.DataFrame(data_nivel_medio), novo_nivel, novo_grau)
+                            vencimento = obter_vencimento(pd.DataFrame(data_nivel_medio), novo_nivel, novo_grau, "Nivel medio")
+                            pontos = pontos_fiscal
                         else:
                             novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, ano_atual)
-                            vencimento = obter_vencimento(pd.DataFrame(data_nivel_superior), novo_nivel, novo_grau)
+                            vencimento = obter_vencimento(pd.DataFrame(data_nivel_superior), novo_nivel, novo_grau, "Nivel superior")
+                            pontos = pontos_superior
 
                         df_zerado.at[idx, 'Nível'] = novo_nivel
                         df_zerado.at[idx, 'Grau'] = novo_grau
-                        df_zerado.at[idx, 'Venc'] = locale.currency(vencimento, grouping=True) if vencimento != 0 else "R$ 0,00"
+                        df_zerado.at[idx, 'Venc-Unitário'] = locale.currency(vencimento, grouping=True) if vencimento != 0 else "R$ 0,00"
 
-                df_zerado_html = df_zerado.to_html(index=False, justify="center", border=0)
+                        # Calcular e preencher a coluna 'Venc-total'
+                        qtd = df.at[idx, 'Qtd']
+                        venc_total = vencimento * qtd
+                        df_zerado.at[idx, 'Venc-Total'] = locale.currency(venc_total, grouping=True) if venc_total != 0 else "R$ 0,00"
 
-                with st.expander(f"{nome}"):
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.markdown(df_html, unsafe_allow_html=True)
-                    with col2:
-                        st.markdown(df_zerado_html, unsafe_allow_html=True)
+                        # Calcular e preencher a coluna 'Desemp'
+                        nivel_roman = roman.toRoman(novo_nivel)
+                        valor_desempenho = desempenho(novo_grau, nivel_roman, upf_value, pontos)
+                        df_zerado.at[idx, 'Desemp'] = locale.currency(valor_desempenho, grouping=True) if valor_desempenho != 0 else "R$ 0,00"
+
+                    df_zerado_html = df_zerado.to_html(index=False, justify="center", border=0)
+
+                    with st.expander(f"{nome}"):
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.markdown(df_html, unsafe_allow_html=True)
+                        with col2:
+                            st.markdown(df_zerado_html, unsafe_allow_html=True)
 
             st.markdown(f"""
             <div style="background-color: #f9f9f9; padding: 20px; border-radius: 5px; margin-top: 20px;">
@@ -684,7 +742,6 @@ elif selected == "Simular PCCR-FOLHA":
             st.experimental_rerun()
 
         st.markdown("---")
-
 
 
 
