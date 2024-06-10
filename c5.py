@@ -672,14 +672,13 @@ elif selected == "Simular PCCR-FOLHA":
                         df_zerado.at[idx, 'Grau'] = novo_grau
                         df_zerado.at[idx, 'Venc-Unitário'] = format_currency_babel(vencimento) if vencimento != 0 else "R$ 0,00"
 
-                        qtd = df.at[idx, 'Qtd']
-                        venc_total = vencimento * qtd * pontos
+                        qtd = row['Qtd']
+                        venc_total = vencimento * qtd
                         df_zerado.at[idx, 'Venc-Total'] = format_currency_babel(venc_total) if venc_total != 0 else "R$ 0,00"
 
                         nivel_roman = roman.toRoman(novo_nivel)
                         valor_desempenho = desempenho(novo_grau, nivel_roman, upf_value, pontos)
                         df_zerado.at[idx, 'Desemp'] = format_currency_babel(valor_desempenho) if valor_desempenho != 0 else "R$ 0,00"
-
                     df_zerado_html = df_zerado.to_html(index=False, justify="center", border=0)
 
                     with st.expander(f"{nome}"):
