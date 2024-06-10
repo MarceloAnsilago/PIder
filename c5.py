@@ -8,12 +8,12 @@ import locale
 import roman
 import uuid
 # Configurando a localização para o Brasil
-import locale
 
-try:
-    locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
-except locale.Error:
-    locale.setlocale(locale.LC_ALL, '')
+
+# try:
+locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
+# except locale.Error:
+#     locale.setlocale(locale.LC_ALL, '')
 
 # Configura a página para o modo wide
 st.set_page_config(layout="wide")
@@ -363,7 +363,13 @@ elif selected == "Mostrar Dados do Quadro":
 
        
 elif selected == "Simular PCCR-FOLHA":
-    # Função para calcular o grau compatível
+    
+    def converter_nivel_para_romano(nivel):
+     try:
+           return roman.toRoman(nivel)
+     except ValueError:
+        return ''
+# Função para calcular o grau compatível
     def calcular_grau(ano_final):
         graus_por_nivel = {
             0: "A",
@@ -676,26 +682,24 @@ elif selected == "Simular PCCR-FOLHA":
                         nivel_atual_str = row['Nível']
                         try:
                             nivel_atual = int(''.join(filter(str.isdigit, nivel_atual_str)))
-                            nivel_roman = roman.toRoman(nivel_atual)
                         except ValueError:
                             nivel_atual = 0
-                            nivel_roman = ''
 
                         if nome == 'Nível Fundamental':
                             novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, ano_atual)
-                            vencimento = obter_vencimento(pd.DataFrame(data_nivel_fundamental), nivel_roman, novo_grau, "Nivel fundamental")
+                            vencimento = obter_vencimento(pd.DataFrame(data_nivel_fundamental), converter_nivel_para_romano(novo_nivel), novo_grau, "Nivel fundamental")
                             pontos = pontos_medio
                         elif nome == 'Assistentes de Gestão':
                             novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, ano_atual)
-                            vencimento = obter_vencimento(pd.DataFrame(data_nivel_medio), nivel_roman, novo_grau, "Nivel medio")
+                            vencimento = obter_vencimento(pd.DataFrame(data_nivel_medio), converter_nivel_para_romano(novo_nivel), novo_grau, "Nivel medio")
                             pontos = pontos_gestao
                         elif nome == 'Assistentes Fiscais':
                             novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, ano_atual)
-                            vencimento = obter_vencimento(pd.DataFrame(data_nivel_medio), nivel_roman, novo_grau, "Nivel medio")
+                            vencimento = obter_vencimento(pd.DataFrame(data_nivel_medio), converter_nivel_para_romano(novo_nivel), novo_grau, "Nivel medio")
                             pontos = pontos_fiscal
                         else:
                             novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, ano_atual)
-                            vencimento = obter_vencimento(pd.DataFrame(data_nivel_superior), nivel_roman, novo_grau, "Nivel superior")
+                            vencimento = obter_vencimento(pd.DataFrame(data_nivel_superior), converter_nivel_para_romano(novo_nivel), novo_grau, "Nivel superior")
                             pontos = pontos_superior
 
                         df_zerado.at[idx, 'Nível'] = novo_nivel
@@ -708,10 +712,11 @@ elif selected == "Simular PCCR-FOLHA":
                         df_zerado.at[idx, 'Venc-Total'] = locale.currency(venc_total, grouping=True) if venc_total != 0 else "R$ 0,00"
 
                         # Calcular e preencher a coluna 'Desemp'
+                        nivel_roman = converter_nivel_para_romano(novo_nivel)
                         valor_desempenho = desempenho(novo_grau, nivel_roman, upf_value, pontos)
                         df_zerado.at[idx, 'Desemp'] = locale.currency(valor_desempenho, grouping=True) if valor_desempenho != 0 else "R$ 0,00"
-
-                    df_zerado_html = df_zerado.to_html(index=False, justify="center", border=0)
+                        
+                        df_zerado_html = df_zerado.to_html(index=False, justify="center", border=0)
 
                     with st.expander(f"{nome}"):
                         col1, col2 = st.columns(2)
