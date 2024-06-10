@@ -419,7 +419,54 @@ elif selected == "Simular PCCR-FOLHA":
         valor_desempenho = upf_value * valor_adic_desempenho * indice_desempenho * pontos
         return valor_desempenho
 
-# Simulação do PCCR-FOLHA
+    # Função para exibir o card com os totais
+    def exibir_card_totais(simulacao):
+        totais_por_dataframe = gerar_totais_por_dataframe(simulacao['dataframes_processados'])
+        totais_gerais = gerar_totais_gerais(simulacao['dataframes_processados'])
+
+        st.markdown(f"""
+        <div style="background-color: #f9f9f9; padding: 20px; border-radius: 5px; margin-top: 20px; font-size: 14px;">
+            <h4>{simulacao['titulo_simulacao']}</h4>
+            <p>{simulacao.get('descricao_opcional', '')}</p>
+            <div style="display: flex; justify-content: space-between;">
+                <div style="width: 50%;">
+                    <h5>Totais por Dataframe</h5>
+                    {totais_por_dataframe}
+                </div>
+                <div style="width: 50%;">
+                    <h5>Totais Gerais</h5>
+                    {totais_gerais}
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    def gerar_totais_por_dataframe(dataframes_processados):
+        totais = []
+        for nome, df in dataframes_processados.items():
+            total_servidores = df['Qtd'].sum()
+            total_vencimento = df['Total_Vencimento'].apply(converter_para_numero).sum()
+            total_desempenho = df['Total_Adicional_Desempenho'].apply(converter_para_numero).sum()
+            totais.append(f"<p><strong>{nome}</strong></p>")
+            totais.append(f"Total de Servidores: {total_servidores}<br>")
+            totais.append(f"Total Salário Base: {format_currency_babel(total_vencimento)}<br>")
+            totais.append(f"Total Adicional de Desempenho: {format_currency_babel(total_desempenho)}<br><br>")
+        return "".join(totais)
+
+    def gerar_totais_gerais(dataframes_processados):
+        total_vencimento_geral = 0
+        total_desempenho_geral = 0
+        for nome, df in dataframes_processados.items():
+            total_vencimento_geral += df['Total_Vencimento'].apply(converter_para_numero).sum()
+            total_desempenho_geral += df['Total_Adicional_Desempenho'].apply(converter_para_numero).sum()
+        total_geral = total_vencimento_geral + total_desempenho_geral
+        totais = []
+        totais.append(f"Total Salário Base: {format_currency_babel(total_vencimento_geral)}<br>")
+        totais.append(f"Total Adicional de Desempenho: {format_currency_babel(total_desempenho_geral)}<br>")
+        totais.append(f"<strong>Total Geral: {format_currency_babel(total_geral)}</strong><br>")
+        return "".join(totais)
+
+    # Simulação do PCCR-FOLHA
     try:
         df_servidores = pd.read_excel('dados_completos.xlsx')
     except Exception as e:
@@ -455,34 +502,21 @@ elif selected == "Simular PCCR-FOLHA":
             df_agrupado['Total_Adicional_Desempenho'] = df_agrupado['Total_Adicional_Desempenho'].apply(format_currency_babel)
             return df_agrupado
 
-        def exibir_totais(df):
-            total_servidores = df['Quantidade_Servidores'].sum()
-            total_vencimento = df['Total_Vencimento'].apply(converter_para_numero).sum()
-            total_desempenho = df['Total_Adicional_Desempenho'].apply(converter_para_numero).sum()
-
-            st.write(f"Total de Servidores: {total_servidores}")
-            st.write(f"Total Salário Base: {format_currency_babel(total_vencimento)}")
-            st.write(f"Total Adicional de Desempenho: {format_currency_babel(total_desempenho)}")
-
         with st.expander("Servidores de Nível Fundamental"):
             df_fundamental = processar_dataframe(df_nivel_fundamental)
             st.dataframe(df_fundamental)
-            exibir_totais(df_fundamental)
 
         with st.expander("Assistentes de Gestão"):
             df_gestao = processar_dataframe(df_assistentes_gestao)
             st.dataframe(df_gestao)
-            exibir_totais(df_gestao)
 
         with st.expander("Assistentes Fiscais"):
             df_fiscal = processar_dataframe(df_assistentes_fiscais)
             st.dataframe(df_fiscal)
-            exibir_totais(df_fiscal)
 
         with st.expander("Cargos de Nível Superior"):
             df_superior = processar_dataframe(df_nivel_superior)
             st.dataframe(df_superior)
-            exibir_totais(df_superior)
 
         col1, col2, col3, col4 = st.columns(4)
         graus_nivel_superior = {
@@ -560,8 +594,6 @@ elif selected == "Simular PCCR-FOLHA":
                 grau_superior = graus_nivel_superior[tipo_salario_superior]
                 st.write(f"Grau: {grau_superior}")
 
-# A partir daqui, continue com o restante do código normalmente
-
         col1, col2 = st.columns(2)
         with col1:
             upf_value = st.number_input("Valor do UPF", min_value=0.0, value=113.60)
@@ -587,35 +619,35 @@ elif selected == "Simular PCCR-FOLHA":
                     'Ano': 'Ano',
                     'Nível': 'Nível',
                     'Quantidade_Servidores': 'Qtd',
-                    'Total_Venc': 'Venc',
-                    'Total_Adicional_Desempenho': 'Desemp'
+                    'Total_Vencimento': 'Total_Vencimento',
+                    'Total_Adicional_Desempenho': 'Total_Adicional_Desempenho'
                 }, inplace=True)
             numero_simulacao = len(st.session_state.simulacoes) + 1
             titulo_simulacao = f"Simulação {numero_simulacao}: {descricao_opcional}" if descricao_opcional else f"Simulação {numero_simulacao}"
             simulacao_id = str(uuid.uuid4())
 
             st.session_state.simulacoes.append({
-            'titulo_simulacao': titulo_simulacao,
-            'dataframes_processados': dataframes_processados,
-            'simulacao_id': simulacao_id,
-            'checkbox_states': {
-                'simular_fundamental': simular_fundamental,
-                'simular_gestao': simular_gestao,
-                'simular_fiscal': simular_fiscal,
-                'simular_superior': simular_superior,
-            },
-            'upf_value': upf_value,
-            'ano_final': ano_final,
-            'pontos_medio': pontos_medio if simular_fundamental else 0,
-            'pontos_gestao': pontos_gestao if simular_gestao else 0,
-            'pontos_fiscal': pontos_fiscal if simular_fiscal else 0,
-            'pontos_superior': pontos_superior if simular_superior else 0,
-            'grau_fundamental': grau_fundamental if simular_fundamental else '',
-            'grau_gestao': grau_gestao if simular_gestao else '',
-            'grau_fiscal': grau_fiscal if simular_fiscal else '',
-            'grau_superior': grau_superior if simular_superior else ''
-        })
-
+                'titulo_simulacao': titulo_simulacao,
+                'descricao_opcional': descricao_opcional,
+                'dataframes_processados': dataframes_processados,
+                'simulacao_id': simulacao_id,
+                'checkbox_states': {
+                    'simular_fundamental': simular_fundamental,
+                    'simular_gestao': simular_gestao,
+                    'simular_fiscal': simular_fiscal,
+                    'simular_superior': simular_superior,
+                },
+                'upf_value': upf_value,
+                'ano_final': ano_final,
+                'pontos_medio': pontos_medio if simular_fundamental else 0,
+                'pontos_gestao': pontos_gestao if simular_gestao else 0,
+                'pontos_fiscal': pontos_fiscal if simular_fiscal else 0,
+                'pontos_superior': pontos_superior if simular_superior else 0,
+                'grau_fundamental': grau_fundamental if simular_fundamental else '',
+                'grau_gestao': grau_gestao if simular_gestao else '',
+                'grau_fiscal': grau_fiscal if simular_fiscal else '',
+                'grau_superior': grau_superior if simular_superior else ''
+            })
 
         simulacoes_para_remover = []
         for simulacao_idx, simulacao in enumerate(st.session_state.simulacoes):
@@ -702,12 +734,8 @@ elif selected == "Simular PCCR-FOLHA":
                         with col2:
                             st.markdown(df_zerado_html, unsafe_allow_html=True)
 
-            st.markdown(f"""
-            <div style="background-color: #f9f9f9; padding: 20px; border-radius: 5px; margin-top: 20px;">
-                <h4>{simulacao['titulo_simulacao']}</h4>
-                <p>Estratificações</p>
-            </div>
-            """, unsafe_allow_html=True)
+            # Exibir o card com os totais
+            exibir_card_totais(simulacao)
 
             if st.button(f"Excluir Simulação {simulacao['titulo_simulacao']}", key=f"excluir_{simulacao['simulacao_id']}_{simulacao_idx}"):
                 simulacoes_para_remover.append(simulacao['simulacao_id'])
@@ -717,9 +745,6 @@ elif selected == "Simular PCCR-FOLHA":
             st.experimental_rerun()
 
         st.markdown("---")
-
-
-
 
 
 
