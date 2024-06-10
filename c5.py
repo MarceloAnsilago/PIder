@@ -618,7 +618,7 @@ elif selected == "Simular PCCR-FOLHA":
 
 
         simulacoes_para_remover = []
-        for simulacao in st.session_state.simulacoes:
+        for simulacao_idx, simulacao in enumerate(st.session_state.simulacoes):
             st.markdown(f"### {simulacao['titulo_simulacao']}")
             st.write("#### FOLHA DE PONTO ATUAL")
             for nome, df in simulacao['dataframes_processados'].items():
@@ -631,6 +631,10 @@ elif selected == "Simular PCCR-FOLHA":
                 grau_gestao = simulacao['grau_gestao']
                 grau_fiscal = simulacao['grau_fiscal']
                 grau_superior = simulacao['grau_superior']
+                pontos_medio = simulacao['pontos_medio']
+                pontos_gestao = simulacao['pontos_gestao']
+                pontos_fiscal = simulacao['pontos_fiscal']
+                pontos_superior = simulacao['pontos_superior']
 
                 if (nome == 'Nível Fundamental' and checkbox_states['simular_fundamental']) or \
                     (nome == 'Assistentes de Gestão' and checkbox_states['simular_gestao']) or \
@@ -642,6 +646,7 @@ elif selected == "Simular PCCR-FOLHA":
                         'Grau': [''] * len(df),
                         'Venc-Unitário': [''] * len(df),
                         'Venc-Total': [''] * len(df),
+                        'Pontos': [''] * len(df),  # Adiciona a coluna Pontos
                         'Desemp': [''] * len(df),
                         'Desemp-Total': [''] * len(df)
                     })
@@ -678,12 +683,16 @@ elif selected == "Simular PCCR-FOLHA":
                         venc_total = vencimento * qtd
                         df_zerado.at[idx, 'Venc-Total'] = format_currency_babel(venc_total) if venc_total != 0 else "R$ 0,00"
 
+                        # Preencher a coluna Pontos
+                        df_zerado.at[idx, 'Pontos'] = pontos
+
                         nivel_roman = roman.toRoman(novo_nivel)
                         valor_desempenho = desempenho(novo_grau, nivel_roman, upf_value, pontos)
                         df_zerado.at[idx, 'Desemp'] = format_currency_babel(valor_desempenho) if valor_desempenho != 0 else "R$ 0,00"
 
                         desemp_total = valor_desempenho * qtd
                         df_zerado.at[idx, 'Desemp-Total'] = format_currency_babel(desemp_total) if desemp_total != 0 else "R$ 0,00"
+
                     df_zerado_html = df_zerado.to_html(index=False, justify="center", border=0)
 
                     with st.expander(f"{nome}"):
@@ -692,14 +701,15 @@ elif selected == "Simular PCCR-FOLHA":
                             st.markdown(df_html, unsafe_allow_html=True)
                         with col2:
                             st.markdown(df_zerado_html, unsafe_allow_html=True)
+
             st.markdown(f"""
             <div style="background-color: #f9f9f9; padding: 20px; border-radius: 5px; margin-top: 20px;">
-                <h4>Provisório</h4>
+                <h4>{simulacao['titulo_simulacao']}</h4>
                 <p>Estratificações</p>
             </div>
             """, unsafe_allow_html=True)
 
-            if st.button(f"Excluir Simulação {simulacao['titulo_simulacao']}", key=f"excluir_{simulacao['simulacao_id']}"):
+            if st.button(f"Excluir Simulação {simulacao['titulo_simulacao']}", key=f"excluir_{simulacao['simulacao_id']}_{simulacao_idx}"):
                 simulacoes_para_remover.append(simulacao['simulacao_id'])
 
         if simulacoes_para_remover:
@@ -707,6 +717,11 @@ elif selected == "Simular PCCR-FOLHA":
             st.experimental_rerun()
 
         st.markdown("---")
+
+
+
+
+
 
 
 
