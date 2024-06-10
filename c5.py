@@ -641,7 +641,8 @@ elif selected == "Simular PCCR-FOLHA":
                         'Grau': [''] * len(df),
                         'Venc-Unitário': [''] * len(df),
                         'Venc-Total': [''] * len(df),
-                        'Desemp': [''] * len(df)
+                        'Desemp': [''] * len(df),
+                        'Desemp-Total': [''] * len(df)
                     })
 
                     for idx, row in df.iterrows():
@@ -679,6 +680,9 @@ elif selected == "Simular PCCR-FOLHA":
                         nivel_roman = roman.toRoman(novo_nivel)
                         valor_desempenho = desempenho(novo_grau, nivel_roman, upf_value, pontos)
                         df_zerado.at[idx, 'Desemp'] = format_currency_babel(valor_desempenho) if valor_desempenho != 0 else "R$ 0,00"
+
+                        desemp_total = valor_desempenho * qtd
+                        df_zerado.at[idx, 'Desemp-Total'] = format_currency_babel(desemp_total) if desemp_total != 0 else "R$ 0,00"
                     df_zerado_html = df_zerado.to_html(index=False, justify="center", border=0)
 
                     with st.expander(f"{nome}"):
