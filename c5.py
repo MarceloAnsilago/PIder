@@ -17,7 +17,12 @@ from babel.numbers import format_currency
 
 
 # Configura a página para o modo wide
-st.set_page_config(layout="wide")
+# st.set_page_config(layout="wide")
+st.set_page_config(
+    layout="wide",
+    page_title="PCCR IDARON",
+    page_icon="💰",
+)
 
 
 def format_currency_babel(value):
@@ -420,6 +425,7 @@ elif selected == "Simular PCCR-FOLHA":
         return valor_desempenho
 
     # Função para exibir o card com os totais
+  # Função para exibir o card com os totais
     def exibir_card_totais(simulacao):
         totais_por_dataframe = gerar_totais_por_dataframe(simulacao['dataframes_processados'])
         totais_gerais = gerar_totais_gerais(simulacao['dataframes_processados'])
@@ -428,12 +434,10 @@ elif selected == "Simular PCCR-FOLHA":
         <div style="background-color: #f9f9f9; padding: 20px; border-radius: 5px; margin-top: 20px; font-size: 14px;">
             <h4>{simulacao['titulo_simulacao']}</h4>
             <p>{simulacao.get('descricao_opcional', '')}</p>
-            <div style="display: flex; justify-content: space-between;">
-                <div style="width: 50%;">
-                    <h5>Totais por Dataframe</h5>
-                    {totais_por_dataframe}
-                </div>
-                <div style="width: 50%;">
+            <div>
+                <h5>Totais por Dataframe</h5>
+                {totais_por_dataframe}
+                <div>
                     <h5>Totais Gerais</h5>
                     {totais_gerais}
                 </div>
@@ -745,6 +749,7 @@ elif selected == "Simular PCCR-FOLHA":
             st.experimental_rerun()
 
         st.markdown("---")
+
 
 
 
