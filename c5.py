@@ -372,9 +372,9 @@ elif selected == "Mostrar Dados do Quadro":
 
 
        
-
 elif selected == "Simular PCCR-FOLHA":
-    # Função para calcular o grau compatível
+
+
     def calcular_grau(ano_final):
         graus_por_nivel = {
             0: "A",
@@ -423,53 +423,41 @@ elif selected == "Simular PCCR-FOLHA":
         indice_desempenho = df_indice_desempenho.loc[df_indice_desempenho['NIVEL'] == nivel_roman, 'ÍNDICE DE ADICIONAL DE DESEMPENHO'].values[0]
         valor_desempenho = upf_value * valor_adic_desempenho * indice_desempenho * pontos
         return valor_desempenho
+    
 
-    # Função para exibir o card com os totais
-  # Função para exibir o card com os totais
-    def exibir_card_totais(simulacao):
-        totais_por_dataframe = gerar_totais_por_dataframe(simulacao['dataframes_processados'])
-        totais_gerais = gerar_totais_gerais(simulacao['dataframes_processados'])
+    def exibir_totais(simulacao):
+        checkbox_states = simulacao['checkbox_states']
+        totais_atuais = gerar_totais(simulacao['dataframes_processados'], checkbox_states, "atuais")
+        totais_simulados = gerar_totais(simulacao['dataframes_simulados'], checkbox_states, "simulados")
 
-        st.markdown(f"""
-        <div style="background-color: #f9f9f9; padding: 20px; border-radius: 5px; margin-top: 20px; font-size: 14px;">
-            <h4>{simulacao['titulo_simulacao']}</h4>
-            <p>{simulacao.get('descricao_opcional', '')}</p>
-            <div>
-                <h5>Totais por Dataframe</h5>
-                {totais_por_dataframe}
-                <div>
-                    <h5>Totais Gerais</h5>
-                    {totais_gerais}
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("### Valores Atuais")
+            st.markdown(totais_atuais, unsafe_allow_html=True)
+        with col2:
+            st.markdown("### Totais Simulados")
+            st.markdown(totais_simulados, unsafe_allow_html=True)
 
-    def gerar_totais_por_dataframe(dataframes_processados):
+    def gerar_totais(dataframes_processados, checkbox_states, simulacao_tipo):
         totais = []
         for nome, df in dataframes_processados.items():
-            total_servidores = df['Qtd'].sum()
-            total_vencimento = df['Total_Vencimento'].apply(converter_para_numero).sum()
-            total_desempenho = df['Total_Adicional_Desempenho'].apply(converter_para_numero).sum()
-            totais.append(f"<p><strong>{nome}</strong></p>")
-            totais.append(f"Total de Servidores: {total_servidores}<br>")
-            totais.append(f"Total Salário Base: {format_currency_babel(total_vencimento)}<br>")
-            totais.append(f"Total Adicional de Desempenho: {format_currency_babel(total_desempenho)}<br><br>")
+            if simulacao_tipo == "atuais" or (
+                (nome == 'Nível Fundamental' and checkbox_states['simular_fundamental']) or
+                (nome == 'Assistentes de Gestão' and checkbox_states['simular_gestao']) or
+                (nome == 'Assistentes Fiscais' and checkbox_states['simular_fiscal']) or
+                (nome == 'Cargos de Nível Superior' and checkbox_states['simular_superior'])):
+                total_servidores = df['Qtd'].sum()
+                total_vencimento = df['Total_Vencimento'].apply(converter_para_numero).sum()
+                total_desempenho = df['Total_Adicional_Desempenho'].apply(converter_para_numero).sum()
+            else:
+                total_servidores = 0
+                total_vencimento = 0.0
+                total_desempenho = 0.0
+            totais.append(f"<div><b>{nome}:</b></div>")
+            totais.append(f"<div>. Total de Servidores: {total_servidores}</div>")
+            totais.append(f"<div>. Total Salário Base: {format_currency_babel(total_vencimento)}</div>")
+            totais.append(f"<div>. Total Adicional de Desempenho: {format_currency_babel(total_desempenho)}</div><br>")
         return "".join(totais)
-
-    def gerar_totais_gerais(dataframes_processados):
-        total_vencimento_geral = 0
-        total_desempenho_geral = 0
-        for nome, df in dataframes_processados.items():
-            total_vencimento_geral += df['Total_Vencimento'].apply(converter_para_numero).sum()
-            total_desempenho_geral += df['Total_Adicional_Desempenho'].apply(converter_para_numero).sum()
-        total_geral = total_vencimento_geral + total_desempenho_geral
-        totais = []
-        totais.append(f"Total Salário Base: {format_currency_babel(total_vencimento_geral)}<br>")
-        totais.append(f"Total Adicional de Desempenho: {format_currency_babel(total_desempenho_geral)}<br>")
-        totais.append(f"<strong>Total Geral: {format_currency_babel(total_geral)}</strong><br>")
-        return "".join(totais)
-
     # Simulação do PCCR-FOLHA
     try:
         df_servidores = pd.read_excel('dados_completos.xlsx')
@@ -626,6 +614,42 @@ elif selected == "Simular PCCR-FOLHA":
                     'Total_Vencimento': 'Total_Vencimento',
                     'Total_Adicional_Desempenho': 'Total_Adicional_Desempenho'
                 }, inplace=True)
+            
+            # Criar dataframes simulados
+            dataframes_simulados = {}
+            for nome, df in dataframes_processados.items():
+                df_simulado = df.copy()
+                for idx, row in df.iterrows():
+                    nivel_atual_str = row['Nível']
+                    try:
+                        nivel_atual = int(''.join(filter(str.isdigit, nivel_atual_str)))
+                    except ValueError:
+                        nivel_atual = 0
+
+                    if nome == 'Nível Fundamental':
+                        novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, datetime.now().year)
+                        vencimento = obter_vencimento(pd.DataFrame(data_nivel_fundamental), novo_nivel, novo_grau, "Nivel fundamental")
+                        pontos = pontos_medio
+                    elif nome == 'Assistentes de Gestão':
+                        novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, datetime.now().year)
+                        vencimento = obter_vencimento(pd.DataFrame(data_nivel_medio), novo_nivel, novo_grau, "Nivel medio")
+                        pontos = pontos_gestao
+                    elif nome == 'Assistentes Fiscais':
+                        novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, datetime.now().year)
+                        vencimento = obter_vencimento(pd.DataFrame(data_nivel_medio), novo_nivel, novo_grau, "Nivel medio")
+                        pontos = pontos_fiscal
+                    else:
+                        novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, datetime.now().year)
+                        vencimento = obter_vencimento(pd.DataFrame(data_nivel_superior), novo_nivel, novo_grau, "Nivel superior")
+                        pontos = pontos_superior
+
+                    df_simulado.at[idx, 'Nível'] = novo_nivel
+                    df_simulado.at[idx, 'Grau'] = novo_grau
+                    df_simulado.at[idx, 'Total_Vencimento'] = vencimento * row['Qtd']
+                    df_simulado.at[idx, 'Total_Adicional_Desempenho'] = desempenho(novo_grau, roman.toRoman(novo_nivel), upf_value, pontos) * row['Qtd']
+
+                dataframes_simulados[nome] = df_simulado
+
             numero_simulacao = len(st.session_state.simulacoes) + 1
             titulo_simulacao = f"Simulação {numero_simulacao}: {descricao_opcional}" if descricao_opcional else f"Simulação {numero_simulacao}"
             simulacao_id = str(uuid.uuid4())
@@ -634,6 +658,7 @@ elif selected == "Simular PCCR-FOLHA":
                 'titulo_simulacao': titulo_simulacao,
                 'descricao_opcional': descricao_opcional,
                 'dataframes_processados': dataframes_processados,
+                'dataframes_simulados': dataframes_simulados,
                 'simulacao_id': simulacao_id,
                 'checkbox_states': {
                     'simular_fundamental': simular_fundamental,
@@ -658,8 +683,6 @@ elif selected == "Simular PCCR-FOLHA":
             st.markdown(f"### {simulacao['titulo_simulacao']}")
             st.write("#### FOLHA DE PONTO ATUAL")
             for nome, df in simulacao['dataframes_processados'].items():
-                df_html = df.to_html(index=False, justify="center", border=0)
-
                 checkbox_states = simulacao['checkbox_states']
                 ano_atual = datetime.now().year
                 ano_final = simulacao['ano_final']
@@ -729,29 +752,29 @@ elif selected == "Simular PCCR-FOLHA":
                         desemp_total = valor_desempenho * qtd
                         df_zerado.at[idx, 'Desemp-Total'] = format_currency_babel(desemp_total) if desemp_total != 0 else "R$ 0,00"
 
-                    df_zerado_html = df_zerado.to_html(index=False, justify="center", border=0)
-
                     with st.expander(f"{nome}"):
                         col1, col2 = st.columns(2)
                         with col1:
-                            st.markdown(df_html, unsafe_allow_html=True)
+                            st.dataframe(df)
                         with col2:
-                            st.markdown(df_zerado_html, unsafe_allow_html=True)
+                            st.dataframe(df_zerado)
 
-            # Exibir o card com os totais
-            exibir_card_totais(simulacao)
+            # Exibir os totais
+            exibir_totais(simulacao)
 
-            if st.button(f"Excluir Simulação {simulacao['titulo_simulacao']}", key=f"excluir_{simulacao['simulacao_id']}_{simulacao_idx}"):
-                simulacoes_para_remover.append(simulacao['simulacao_id'])
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write(f"Relatório gerado para a simulação: {simulacao['titulo_simulacao']}")
+
+            with col2:
+                if st.button(f"Excluir Simulação {simulacao['titulo_simulacao']}", key=f"excluir_{simulacao['simulacao_id']}_{simulacao_idx}"):
+                    simulacoes_para_remover.append(simulacao['simulacao_id'])
 
         if simulacoes_para_remover:
             st.session_state.simulacoes = [sim for sim in st.session_state.simulacoes if sim['simulacao_id'] not in simulacoes_para_remover]
             st.experimental_rerun()
 
         st.markdown("---")
-
-
-
 
 
 
