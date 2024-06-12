@@ -443,11 +443,12 @@ elif selected == "Simular PCCR-FOLHA":
 
 
 
-
     def gerar_totais(dataframes_processados, dataframes_referencias, checkbox_states, simulacao_tipo, pontos_medio, pontos_gestao, pontos_fiscal, pontos_superior, ano_final):
         totais = []
         total_vencimento_geral = 0.0
         total_desempenho_geral = 0.0
+        total_diferenca_vencimento = 0.0
+        total_diferenca_desempenho = 0.0
 
         for nome, df in dataframes_processados.items():
             df_referencia = dataframes_referencias.get(nome, pd.DataFrame())
@@ -488,6 +489,7 @@ elif selected == "Simular PCCR-FOLHA":
 
                 if total_vencimento > 0:
                     diferenca_vencimento = total_vencimento - total_vencimento_referencia
+                    total_diferenca_vencimento += diferenca_vencimento
                     totais.append(f"<div>. Pontos: {pontos} | Ano: {ano_final}</div>")
                     totais.append(f"<div>. Total Salário Base: {format_currency_babel(total_vencimento)} | Diferença: {format_currency_babel(diferenca_vencimento) if diferenca_vencimento != 0 else '-'}</div>")
                 else:
@@ -496,6 +498,7 @@ elif selected == "Simular PCCR-FOLHA":
                 
                 if total_desempenho > 0:
                     diferenca_desempenho = total_desempenho - total_desempenho_referencia
+                    total_diferenca_desempenho += diferenca_desempenho
                     totais.append(f"<div>. Total Adicional de Desempenho: {format_currency_babel(total_desempenho)} | Diferença: {format_currency_babel(diferenca_desempenho) if diferenca_desempenho != 0 else '-'}</div>")
                 else:
                     totais.append(f"<div>. Total Adicional de Desempenho: {format_currency_babel(total_desempenho)}</div>")
@@ -505,6 +508,13 @@ elif selected == "Simular PCCR-FOLHA":
         totais.append(f"<div><b>Total Geral:</b></div>")
         totais.append(f"<div>. Total Salário Base: {format_currency_babel(total_vencimento_geral)}</div>")
         totais.append(f"<div>. Total Adicional de Desempenho: {format_currency_babel(total_desempenho_geral)}</div><br>")
+        
+        if simulacao_tipo == "simulados":
+            totais.append(f"<div><b>Diferença Somada:</b></div>")
+            totais.append(f"<div>. Total Diferença Salário Base: {format_currency_babel(total_diferenca_vencimento)}</div>")
+            totais.append(f"<div>. Total Diferença Adicional de Desempenho: {format_currency_babel(total_diferenca_desempenho)}</div>")
+            totais.append(f"<div>. Total Diferença: {format_currency_babel(total_diferenca_vencimento + total_diferenca_desempenho)}</div>")
+            totais.append(f"<div>. Total Diferença Anual (x12): {format_currency_babel((total_diferenca_vencimento + total_diferenca_desempenho) * 12)}</div><br>")
 
         return "".join(totais)
 
@@ -627,7 +637,7 @@ elif selected == "Simular PCCR-FOLHA":
         with col4:
             simular_superior = st.checkbox("Simular Cargos de Nível Superior")
             if simular_superior:
-                pontos_superior = st.number_input("Pontos", min_value=0, step=1, value=2900, key="pontos_superior", format="%d")
+                pontos_superior = st.number_input("Pontos", min_value=0, step=1, value=3900, key="pontos_superior", format="%d")
                 tipo_salario_superior = st.radio(
                     "Tipo de Salário",
                     ["FORMAÇÃO REQUISITO PARA INGRESSO", "CAPACITAÇÃO", "ESPECIALIZAÇÃO", "GRADUAÇÃO POSTERIOR RELACIONADA ÁS ATRIBUIÇÕES DO CARGO", "MESTRADO", "DOUTORADO"],
@@ -814,7 +824,7 @@ elif selected == "Simular PCCR-FOLHA":
 
             col1, col2 = st.columns(2)
             with col1:
-                st.write(f"Relatório gerado para a simulação: {simulacao['titulo_simulacao']}")
+                st.write(f"Relat. gerado para a : {simulacao['titulo_simulacao']}")
 
             with col2:
                 if st.button(f"Excluir Simulação {simulacao['titulo_simulacao']}", key=f"excluir_{simulacao['simulacao_id']}_{simulacao_idx}"):
