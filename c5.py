@@ -427,8 +427,8 @@ elif selected == "Simular PCCR-FOLHA":
 
     def exibir_totais(simulacao):
         checkbox_states = simulacao['checkbox_states']
-        totais_atuais = gerar_totais(simulacao['dataframes_processados'], checkbox_states, "atuais", simulacao['pontos_medio'], simulacao['pontos_gestao'], simulacao['pontos_fiscal'], simulacao['pontos_superior'], simulacao['ano_final'])
-        totais_simulados = gerar_totais(simulacao['dataframes_simulados'], checkbox_states, "simulados", simulacao['pontos_medio'], simulacao['pontos_gestao'], simulacao['pontos_fiscal'], simulacao['pontos_superior'], simulacao['ano_final'])
+        totais_atuais = gerar_totais(simulacao['dataframes_processados'], simulacao['dataframes_processados'], checkbox_states, "atuais", simulacao['pontos_medio'], simulacao['pontos_gestao'], simulacao['pontos_fiscal'], simulacao['pontos_superior'], simulacao['ano_final'])
+        totais_simulados = gerar_totais(simulacao['dataframes_simulados'], simulacao['dataframes_processados'], checkbox_states, "simulados", simulacao['pontos_medio'], simulacao['pontos_gestao'], simulacao['pontos_fiscal'], simulacao['pontos_superior'], simulacao['ano_final'])
 
         col1, col2 = st.columns(2)
         with col1:
@@ -444,14 +444,14 @@ elif selected == "Simular PCCR-FOLHA":
 
 
 
-
-
-    def gerar_totais(dataframes_processados, checkbox_states, simulacao_tipo, pontos_medio, pontos_gestao, pontos_fiscal, pontos_superior, ano_final):
+    def gerar_totais(dataframes_processados, dataframes_referencias, checkbox_states, simulacao_tipo, pontos_medio, pontos_gestao, pontos_fiscal, pontos_superior, ano_final):
         totais = []
         total_vencimento_geral = 0.0
         total_desempenho_geral = 0.0
 
         for nome, df in dataframes_processados.items():
+            df_referencia = dataframes_referencias.get(nome, pd.DataFrame())
+            
             if simulacao_tipo == "atuais" or (
                 (nome == 'Nível Fundamental' and checkbox_states['simular_fundamental']) or
                 (nome == 'Assistentes de Gestão' and checkbox_states['simular_gestao']) or
@@ -480,19 +480,33 @@ elif selected == "Simular PCCR-FOLHA":
             totais.append(f"<div><b>{nome}:</b></div>")
             if simulacao_tipo == "atuais":
                 totais.append(f"<div>. Total de Servidores: {total_servidores}</div>")
+                totais.append(f"<div>. Total Salário Base: {format_currency_babel(total_vencimento)}</div>")
+                totais.append(f"<div>. Total Adicional de Desempenho: {format_currency_babel(total_desempenho)}</div><br>")
             else:
-                totais.append(f"<div>. Pontos: {pontos} | Ano: {ano_final}</div>")
-            totais.append(f"<div>. Total Salário Base: {format_currency_babel(total_vencimento)}</div>")
-            totais.append(f"<div>. Total Adicional de Desempenho: {format_currency_babel(total_desempenho)}</div><br>")
+                total_vencimento_referencia = df_referencia['Total_Vencimento'].apply(converter_para_numero).sum() if not df_referencia.empty else 0.0
+                total_desempenho_referencia = df_referencia['Total_Adicional_Desempenho'].apply(converter_para_numero).sum() if not df_referencia.empty else 0.0
+
+                if total_vencimento > 0:
+                    diferenca_vencimento = total_vencimento - total_vencimento_referencia
+                    totais.append(f"<div>. Pontos: {pontos} | Ano: {ano_final}</div>")
+                    totais.append(f"<div>. Total Salário Base: {format_currency_babel(total_vencimento)} | Diferença: {format_currency_babel(diferenca_vencimento) if diferenca_vencimento != 0 else '-'}</div>")
+                else:
+                    totais.append(f"<div>. Pontos: {pontos} | Ano: {ano_final}</div>")
+                    totais.append(f"<div>. Total Salário Base: {format_currency_babel(total_vencimento)}</div>")
+                
+                if total_desempenho > 0:
+                    diferenca_desempenho = total_desempenho - total_desempenho_referencia
+                    totais.append(f"<div>. Total Adicional de Desempenho: {format_currency_babel(total_desempenho)} | Diferença: {format_currency_babel(diferenca_desempenho) if diferenca_desempenho != 0 else '-'}</div>")
+                else:
+                    totais.append(f"<div>. Total Adicional de Desempenho: {format_currency_babel(total_desempenho)}</div>")
+                
+                totais.append("<br>")
 
         totais.append(f"<div><b>Total Geral:</b></div>")
         totais.append(f"<div>. Total Salário Base: {format_currency_babel(total_vencimento_geral)}</div>")
         totais.append(f"<div>. Total Adicional de Desempenho: {format_currency_babel(total_desempenho_geral)}</div><br>")
 
         return "".join(totais)
-
-
-
 
     # Simulação do PCCR-FOLHA
     try:
