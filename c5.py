@@ -437,7 +437,8 @@ elif selected == "Simular PCCR-FOLHA":
         with col2:
             st.markdown("### Totais Simulados")
             st.markdown(totais_simulados, unsafe_allow_html=True)
-
+        
+        st.markdown("---")
 
 
 
@@ -447,6 +448,9 @@ elif selected == "Simular PCCR-FOLHA":
 
     def gerar_totais(dataframes_processados, checkbox_states, simulacao_tipo, pontos_medio, pontos_gestao, pontos_fiscal, pontos_superior, ano_final):
         totais = []
+        total_vencimento_geral = 0.0
+        total_desempenho_geral = 0.0
+
         for nome, df in dataframes_processados.items():
             if simulacao_tipo == "atuais" or (
                 (nome == 'Nível Fundamental' and checkbox_states['simular_fundamental']) or
@@ -456,6 +460,8 @@ elif selected == "Simular PCCR-FOLHA":
                 total_servidores = df['Qtd'].sum()
                 total_vencimento = df['Total_Vencimento'].apply(converter_para_numero).sum()
                 total_desempenho = df['Total_Adicional_Desempenho'].apply(converter_para_numero).sum()
+                total_vencimento_geral += total_vencimento
+                total_desempenho_geral += total_desempenho
             else:
                 total_servidores = 0
                 total_vencimento = 0.0
@@ -472,12 +478,18 @@ elif selected == "Simular PCCR-FOLHA":
                 pontos = pontos_superior
 
             totais.append(f"<div><b>{nome}:</b></div>")
-            totais.append(f"<div>. Pontos: {pontos} | Ano: {ano_final}</div>")
+            if simulacao_tipo == "atuais":
+                totais.append(f"<div>. Total de Servidores: {total_servidores}</div>")
+            else:
+                totais.append(f"<div>. Pontos: {pontos} | Ano: {ano_final}</div>")
             totais.append(f"<div>. Total Salário Base: {format_currency_babel(total_vencimento)}</div>")
             totais.append(f"<div>. Total Adicional de Desempenho: {format_currency_babel(total_desempenho)}</div><br>")
-        return "".join(totais)
-        
 
+        totais.append(f"<div><b>Total Geral:</b></div>")
+        totais.append(f"<div>. Total Salário Base: {format_currency_babel(total_vencimento_geral)}</div>")
+        totais.append(f"<div>. Total Adicional de Desempenho: {format_currency_babel(total_desempenho_geral)}</div><br>")
+
+        return "".join(totais)
 
 
 
