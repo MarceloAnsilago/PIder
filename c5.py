@@ -427,8 +427,8 @@ elif selected == "Simular PCCR-FOLHA":
 
     def exibir_totais(simulacao):
         checkbox_states = simulacao['checkbox_states']
-        totais_atuais = gerar_totais(simulacao['dataframes_processados'], checkbox_states, "atuais")
-        totais_simulados = gerar_totais(simulacao['dataframes_simulados'], checkbox_states, "simulados")
+        totais_atuais = gerar_totais(simulacao['dataframes_processados'], checkbox_states, "atuais", simulacao['pontos_medio'], simulacao['pontos_gestao'], simulacao['pontos_fiscal'], simulacao['pontos_superior'], simulacao['ano_final'])
+        totais_simulados = gerar_totais(simulacao['dataframes_simulados'], checkbox_states, "simulados", simulacao['pontos_medio'], simulacao['pontos_gestao'], simulacao['pontos_fiscal'], simulacao['pontos_superior'], simulacao['ano_final'])
 
         col1, col2 = st.columns(2)
         with col1:
@@ -438,7 +438,14 @@ elif selected == "Simular PCCR-FOLHA":
             st.markdown("### Totais Simulados")
             st.markdown(totais_simulados, unsafe_allow_html=True)
 
-    def gerar_totais(dataframes_processados, checkbox_states, simulacao_tipo):
+
+
+
+
+
+
+
+    def gerar_totais(dataframes_processados, checkbox_states, simulacao_tipo, pontos_medio, pontos_gestao, pontos_fiscal, pontos_superior, ano_final):
         totais = []
         for nome, df in dataframes_processados.items():
             if simulacao_tipo == "atuais" or (
@@ -453,11 +460,28 @@ elif selected == "Simular PCCR-FOLHA":
                 total_servidores = 0
                 total_vencimento = 0.0
                 total_desempenho = 0.0
+
+            pontos = 0
+            if nome == 'Nível Fundamental':
+                pontos = pontos_medio
+            elif nome == 'Assistentes de Gestão':
+                pontos = pontos_gestao
+            elif nome == 'Assistentes Fiscais':
+                pontos = pontos_fiscal
+            elif nome == 'Cargos de Nível Superior':
+                pontos = pontos_superior
+
             totais.append(f"<div><b>{nome}:</b></div>")
-            totais.append(f"<div>. Total de Servidores: {total_servidores}</div>")
+            totais.append(f"<div>. Pontos: {pontos} | Ano: {ano_final}</div>")
             totais.append(f"<div>. Total Salário Base: {format_currency_babel(total_vencimento)}</div>")
             totais.append(f"<div>. Total Adicional de Desempenho: {format_currency_babel(total_desempenho)}</div><br>")
         return "".join(totais)
+        
+
+
+
+
+
     # Simulação do PCCR-FOLHA
     try:
         df_servidores = pd.read_excel('dados_completos.xlsx')
