@@ -583,18 +583,26 @@ elif selected == "Simular PCCR-FOLHA":
         with st.expander("Servidores de Nível Fundamental"):
             df_fundamental = processar_dataframe(df_nivel_fundamental)
             st.dataframe(df_fundamental)
+            total_servidores_fundamental = df_fundamental['Quantidade_Servidores'].sum()
+            st.write(f"Total de Servidores: {total_servidores_fundamental}")
 
         with st.expander("Assistentes de Gestão"):
             df_gestao = processar_dataframe(df_assistentes_gestao)
             st.dataframe(df_gestao)
+            total_servidores_gestao = df_gestao['Quantidade_Servidores'].sum()
+            st.write(f"Total de Servidores: {total_servidores_gestao}")
 
         with st.expander("Assistentes Fiscais"):
             df_fiscal = processar_dataframe(df_assistentes_fiscais)
             st.dataframe(df_fiscal)
+            total_servidores_fiscal = df_fiscal['Quantidade_Servidores'].sum()
+            st.write(f"Total de Servidores: {total_servidores_fiscal}")
 
         with st.expander("Cargos de Nível Superior"):
             df_superior = processar_dataframe(df_nivel_superior)
             st.dataframe(df_superior)
+            total_servidores_superior = df_superior['Quantidade_Servidores'].sum()
+            st.write(f"Total de Servidores: {total_servidores_superior}")
 
         # Inicialize as variáveis fora do escopo dos checkboxes
         pontos_medio_input = 300
