@@ -356,6 +356,7 @@ elif selected == "Mostrar Dados do Quadro":
 
 elif selected == "Simular PCCR-FOLHA":
 
+    # Funções auxiliares
     def converter_para_numero(valor):
         if isinstance(valor, str):
             valor = valor.replace("R$", "").replace(".", "").replace(",", ".").strip()
@@ -367,13 +368,45 @@ elif selected == "Simular PCCR-FOLHA":
     def format_currency_babel(valor):
         return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
+    def processar_dataframe(df):
+        df['VENCIMENTO'] = df['VENCIMENTO'].apply(converter_para_numero)
+        df['Idaron - Adicional de Desempenho'] = df['Idaron - Adicional de Desempenho'].apply(converter_para_numero)
+
+        df_agrupado = df.groupby(['Ano', 'Nível']).agg(
+            Quantidade_Servidores=('Ano', 'size'),
+            Total_Vencimento=('VENCIMENTO', 'sum'),
+            Total_Adicional_Desempenho=('Idaron - Adicional de Desempenho', 'sum'),
+        ).reset_index()
+
+        df_agrupado['Total_Vencimento'] = df_agrupado['Total_Vencimento'].astype(float)
+        df_agrupado['Total_Adicional_Desempenho'] = df_agrupado['Total_Adicional_Desempenho'].astype(float)
+
+        df_agrupado['Total_Vencimento'] = df_agrupado['Total_Vencimento'].apply(format_currency_babel)
+        df_agrupado['Total_Adicional_Desempenho'] = df_agrupado['Total_Adicional_Desempenho'].apply(format_currency_babel)
+        return df_agrupado
+
+    # Inicialização do estado da sessão se necessário
     if 'simulacoes' not in st.session_state:
         st.session_state.simulacoes = []
 
     if 'simulacoes_para_remover' not in st.session_state:
         st.session_state.simulacoes_para_remover = []
 
-    # Função para calcular o grau
+    if 'usar_pontuacao' not in st.session_state:
+        st.session_state.usar_pontuacao = False
+
+    if 'novo_pontos_medio' not in st.session_state:
+        st.session_state.novo_pontos_medio = 0
+
+    if 'novo_pontos_gestao' not in st.session_state:
+        st.session_state.novo_pontos_gestao = 0
+
+    if 'novo_pontos_fiscal' not in st.session_state:
+        st.session_state.novo_pontos_fiscal = 0
+
+    if 'novo_pontos_superior' not in st.session_state:
+        st.session_state.novo_pontos_superior = 0
+
     def calcular_grau(ano_final, checkbox_state, dataframe_original, nivel_atual_str, radio_mestrado, radio_doutorado):
         grau_original = nivel_atual_str[-1]  # Assume que o grau é a última letra do valor da coluna 'Nível'
         ano_atual = datetime.now().year
@@ -405,7 +438,6 @@ elif selected == "Simular PCCR-FOLHA":
 
         return grau_original
 
-    # Função para determinar o nível
     def determinar_nivel(ano_final, nivel_atual, ano_atual, checkbox_state, dataframe_original, nivel_atual_str, radio_mestrado, radio_doutorado):
         novo_grau = calcular_grau(ano_final, checkbox_state, dataframe_original, nivel_atual_str, radio_mestrado, radio_doutorado)
         
@@ -420,7 +452,6 @@ elif selected == "Simular PCCR-FOLHA":
 
         return novo_nivel, novo_grau
 
-    # Função para obter vencimento
     def obter_vencimento(dataframe_vencimentos, nivel, grau, nivel_educacao):
         cursos = {
             "A": "FORMAÇÃO REQUISITO PARA INGRESSO",
@@ -440,14 +471,12 @@ elif selected == "Simular PCCR-FOLHA":
             return vencimento[0]
         return 0.0
 
-    # Função para calcular desempenho
     def desempenho(grau, nivel_roman, upf_value, pontos):
         valor_adic_desempenho = df_adic_desempenho.loc[df_adic_desempenho['GRAU'] == grau, 'VALOR DO PONTO DO ADIC DE DESEMPENHO'].values[0]
         indice_desempenho = df_indice_desempenho.loc[df_indice_desempenho['NIVEL'] == nivel_roman, 'ÍNDICE DE ADICIONAL DE DESEMPENHO'].values[0]
         valor_desempenho = upf_value * valor_adic_desempenho * indice_desempenho * pontos
         return valor_desempenho
 
-    # Função para exibir totais
     def exibir_totais(simulacao):
         totais_atuais = gerar_totais(simulacao['dataframes_processados'], simulacao['dataframes_processados'], "atuais", simulacao['pontos_medio'], simulacao['pontos_gestao'], simulacao['pontos_fiscal'], simulacao['pontos_superior'], simulacao['ano_final'])
         totais_simulados = gerar_totais(simulacao['dataframes_simulados'], simulacao['dataframes_processados'], "simulados", simulacao['pontos_medio'], simulacao['pontos_gestao'], simulacao['pontos_fiscal'], simulacao['pontos_superior'], simulacao['ano_final'])
@@ -462,7 +491,6 @@ elif selected == "Simular PCCR-FOLHA":
 
         st.markdown("---")
 
-    # Função para gerar totais
     def gerar_totais(dataframes_processados, dataframes_referencias, simulacao_tipo, pontos_medio, pontos_gestao, pontos_fiscal, pontos_superior, ano_final):
         totais = []
         total_vencimento_geral = 0.0
@@ -548,23 +576,6 @@ elif selected == "Simular PCCR-FOLHA":
         df_assistentes_fiscais = df_filtrado[df_filtrado['Cargo/Função/Emprego'] == cargo_fiscal]
         df_nivel_superior = df_filtrado[~df_filtrado['Cargo/Função/Emprego'].isin(cargos_fundamental + [cargo_gestao, cargo_fiscal])]
 
-        def processar_dataframe(df):
-            df['VENCIMENTO'] = df['VENCIMENTO'].apply(converter_para_numero)
-            df['Idaron - Adicional de Desempenho'] = df['Idaron - Adicional de Desempenho'].apply(converter_para_numero)
-
-            df_agrupado = df.groupby(['Ano', 'Nível']).agg(
-                Quantidade_Servidores=('Ano', 'size'),
-                Total_Vencimento=('VENCIMENTO', 'sum'),
-                Total_Adicional_Desempenho=('Idaron - Adicional de Desempenho', 'sum'),
-            ).reset_index()
-
-            df_agrupado['Total_Vencimento'] = df_agrupado['Total_Vencimento'].astype(float)
-            df_agrupado['Total_Adicional_Desempenho'] = df_agrupado['Total_Adicional_Desempenho'].astype(float)
-
-            df_agrupado['Total_Vencimento'] = df_agrupado['Total_Vencimento'].apply(format_currency_babel)
-            df_agrupado['Total_Adicional_Desempenho'] = df_agrupado['Total_Adicional_Desempenho'].apply(format_currency_babel)
-            return df_agrupado
-
         with st.expander("Servidores de Nível Fundamental"):
             df_fundamental = processar_dataframe(df_nivel_fundamental)
             st.dataframe(df_fundamental)
@@ -582,20 +593,16 @@ elif selected == "Simular PCCR-FOLHA":
             st.dataframe(df_superior)
 
         # Inicialize as variáveis fora do escopo dos checkboxes
-        pontos_medio = 0
-        pontos_gestao = 0
-        pontos_fiscal = 0
-        pontos_superior = 0
-        grau_fundamental = ''
-        grau_gestao = ''
-        grau_fiscal = ''
-        grau_superior = ''
+        pontos_medio_input = 300
+        pontos_gestao_input = 500
+        pontos_fiscal_input = 1700
+        pontos_superior_input = 3900
 
         # Define as colunas para os inputs
         col1, col2, col3, col4 = st.columns(4)
 
         with col1:
-            pontos_medio = st.number_input("Pontos", min_value=0, step=1, value=300, key="pontos_medio", format="%d")
+            pontos_medio = st.number_input("Pontos", min_value=0, step=1, value=pontos_medio_input, key="pontos_medio", format="%d")
             simular_fundamental = st.checkbox("Simular Nível Fundamental")
             if simular_fundamental:
                 tipo_salario_medio = st.radio(
@@ -604,10 +611,11 @@ elif selected == "Simular PCCR-FOLHA":
                     key="tipo_salario_medio"
                 )
                 grau_fundamental = 'E' if tipo_salario_medio == 'MESTRADO' else 'F'
-                st.write(f"Grau: {grau_fundamental}")
+            else:
+                grau_fundamental = ''
 
         with col2:
-            pontos_gestao = st.number_input("Pontos", min_value=0, step=1, value=500, key="pontos_gestao", format="%d")
+            pontos_gestao = st.number_input("Pontos", min_value=0, step=1, value=pontos_gestao_input, key="pontos_gestao", format="%d")
             simular_gestao = st.checkbox("Simular Assistentes de Gestão")
             if simular_gestao:
                 tipo_salario_gestao = st.radio(
@@ -616,10 +624,11 @@ elif selected == "Simular PCCR-FOLHA":
                     key="tipo_salario_gestao"
                 )
                 grau_gestao = 'E' if tipo_salario_gestao == 'MESTRADO' else 'F'
-                st.write(f"Grau: {grau_gestao}")
+            else:
+                grau_gestao = ''
 
         with col3:
-            pontos_fiscal = st.number_input("Pontos", min_value=0, step=1, value=1700, key="pontos_fiscal", format="%d")
+            pontos_fiscal = st.number_input("Pontos", min_value=0, step=1, value=pontos_fiscal_input, key="pontos_fiscal", format="%d")
             simular_fiscal = st.checkbox("Simular Assistentes Fiscais")
             if simular_fiscal:
                 tipo_salario_fiscal = st.radio(
@@ -628,10 +637,11 @@ elif selected == "Simular PCCR-FOLHA":
                     key="tipo_salario_fiscal"
                 )
                 grau_fiscal = 'E' if tipo_salario_fiscal == 'MESTRADO' else 'F'
-                st.write(f"Grau: {grau_fiscal}")
+            else:
+                grau_fiscal = ''
 
         with col4:
-            pontos_superior = st.number_input("Pontos", min_value=0, step=1, value=3900, key="pontos_superior", format="%d")
+            pontos_superior = st.number_input("Pontos", min_value=0, step=1, value=pontos_superior_input, key="pontos_superior", format="%d")
             simular_superior = st.checkbox("Simular Cargos de Nível Superior")
             if simular_superior:
                 tipo_salario_superior = st.radio(
@@ -640,7 +650,8 @@ elif selected == "Simular PCCR-FOLHA":
                     key="tipo_salario_superior"
                 )
                 grau_superior = 'E' if tipo_salario_superior == 'MESTRADO' else 'F'
-                st.write(f"Grau: {grau_superior}")
+            else:
+                grau_superior = ''
 
         # Define as colunas para os inputs do UPF e Ano Final
         col1, col2 = st.columns(2)
@@ -651,184 +662,273 @@ elif selected == "Simular PCCR-FOLHA":
 
         descricao_opcional = st.text_input("Descrição opcional")
 
-        if st.button("Simular", key="simular_button_folha"):
-            st.write("Simulação realizada com os parâmetros fornecidos.")
+        # Define as colunas para o botão "Simular" e o expander "Alterar Pontuação"
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            if st.button("Simular", key="simular_button_folha"):
+                st.session_state.simulacoes_para_remover.clear()
 
-            dataframes_processados = {
-                'Nível Fundamental': processar_dataframe(df_nivel_fundamental),
-                'Assistentes de Gestão': processar_dataframe(df_assistentes_gestao),
-                'Assistentes Fiscais': processar_dataframe(df_assistentes_fiscais),
-                'Cargos de Nível Superior': processar_dataframe(df_nivel_superior)
-            }
+                # Determinar quais pontuações usar
+                if st.session_state.get("usar_pontuacao", False):
+                    pontos_medio = st.session_state.get("novo_pontos_medio", pontos_medio)
+                    pontos_gestao = st.session_state.get("novo_pontos_gestao", pontos_gestao)
+                    pontos_fiscal = st.session_state.get("novo_pontos_fiscal", pontos_fiscal)
+                    pontos_superior = st.session_state.get("novo_pontos_superior", pontos_superior)
 
-            for key, df in dataframes_processados.items():
-                df.rename(columns={
-                    'Ano': 'Ano',
-                    'Nível': 'Nível',
-                    'Quantidade_Servidores': 'Qtd',
-                    'Total_Vencimento': 'Total_Vencimento',
-                    'Total_Adicional_Desempenho': 'Total_Adicional_Desempenho'
-                }, inplace=True)
+                # Depuração
+                st.write("Usando pontuações:")
+                st.write(f"Pontos Médio: {pontos_medio}")
+                st.write(f"Pontos Gestão: {pontos_gestao}")
+                st.write(f"Pontos Fiscal: {pontos_fiscal}")
+                st.write(f"Pontos Superior: {pontos_superior}")
 
-            # Criar dataframes simulados
-            dataframes_simulados = {}
-            for nome, df in dataframes_processados.items():
-                df_simulado = df.copy()
-                for idx, row in df.iterrows():
-                    nivel_atual_str = row['Nível']
-                    try:
-                        nivel_atual = int(''.join(filter(str.isdigit, nivel_atual_str)))
-                    except ValueError:
-                        nivel_atual = 0
+                dataframes_processados = {
+                    'Nível Fundamental': processar_dataframe(df_nivel_fundamental),
+                    'Assistentes de Gestão': processar_dataframe(df_assistentes_gestao),
+                    'Assistentes Fiscais': processar_dataframe(df_assistentes_fiscais),
+                    'Cargos de Nível Superior': processar_dataframe(df_nivel_superior)
+                }
 
-                    if nome == 'Nível Fundamental':
-                        novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, datetime.now().year, simular_fundamental, df_nivel_fundamental, nivel_atual_str, grau_fundamental == 'E', grau_fundamental == 'F')
-                        vencimento = obter_vencimento(pd.DataFrame(data_nivel_fundamental), novo_nivel, novo_grau, "Nivel fundamental")
-                        pontos = pontos_medio
-                    elif nome == 'Assistentes de Gestão':
-                        novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, datetime.now().year, simular_gestao, df_assistentes_gestao, nivel_atual_str, grau_gestao == 'E', grau_gestao == 'F')
-                        vencimento = obter_vencimento(pd.DataFrame(data_nivel_medio), novo_nivel, novo_grau, "Nivel medio")
-                        pontos = pontos_gestao
-                    elif nome == 'Assistentes Fiscais':
-                        novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, datetime.now().year, simular_fiscal, df_assistentes_fiscais, nivel_atual_str, grau_fiscal == 'E', grau_fiscal == 'F')
-                        vencimento = obter_vencimento(pd.DataFrame(data_nivel_medio), novo_nivel, novo_grau, "Nivel medio")
-                        pontos = pontos_fiscal
-                    else:
-                        novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, datetime.now().year, simular_superior, df_nivel_superior, nivel_atual_str, grau_superior == 'E', grau_superior == 'F')
-                        vencimento = obter_vencimento(pd.DataFrame(data_nivel_superior), novo_nivel, novo_grau, "Nivel superior")
-                        pontos = pontos_superior
+                for key, df in dataframes_processados.items():
+                    df.rename(columns={
+                        'Ano': 'Ano',
+                        'Nível': 'Nível',
+                        'Quantidade_Servidores': 'Qtd',
+                        'Total_Vencimento': 'Total_Vencimento',
+                        'Total_Adicional_Desempenho': 'Total_Adicional_Desempenho'
+                    }, inplace=True)
 
-                    df_simulado.at[idx, 'Nível'] = novo_nivel
-                    df_simulado.at[idx, 'Grau'] = novo_grau
-                    df_simulado.at[idx, 'Total_Vencimento'] = vencimento * row['Qtd']
-                    df_simulado.at[idx, 'Total_Adicional_Desempenho'] = desempenho(novo_grau, roman.toRoman(novo_nivel), upf_value, pontos) * row['Qtd']
+                # Criar dataframes simulados
+                dataframes_simulados = {}
+                for nome, df in dataframes_processados.items():
+                    df_simulado = df.copy()
+                    for idx, row in df.iterrows():
+                        nivel_atual_str = row['Nível']
+                        try:
+                            nivel_atual = int(''.join(filter(str.isdigit, nivel_atual_str)))
+                        except ValueError:
+                            nivel_atual = 0
 
-                dataframes_simulados[nome] = df_simulado
+                        if nome == 'Nível Fundamental':
+                            novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, datetime.now().year, simular_fundamental, df_nivel_fundamental, nivel_atual_str, grau_fundamental == 'E', grau_fundamental == 'F')
+                            vencimento = obter_vencimento(pd.DataFrame(data_nivel_fundamental), novo_nivel, novo_grau, "Nivel fundamental")
+                            pontos = pontos_medio
+                        elif nome == 'Assistentes de Gestão':
+                            novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, datetime.now().year, simular_gestao, df_assistentes_gestao, nivel_atual_str, grau_gestao == 'E', grau_gestao == 'F')
+                            vencimento = obter_vencimento(pd.DataFrame(data_nivel_medio), novo_nivel, novo_grau, "Nivel medio")
+                            pontos = pontos_gestao
+                        elif nome == 'Assistentes Fiscais':
+                            novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, datetime.now().year, simular_fiscal, df_assistentes_fiscais, nivel_atual_str, grau_fiscal == 'E', grau_fiscal == 'F')
+                            vencimento = obter_vencimento(pd.DataFrame(data_nivel_medio), novo_nivel, novo_grau, "Nivel medio")
+                            pontos = pontos_fiscal
+                        else:
+                            novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, datetime.now().year, simular_superior, df_nivel_superior, nivel_atual_str, grau_superior == 'E', grau_superior == 'F')
+                            vencimento = obter_vencimento(pd.DataFrame(data_nivel_superior), novo_nivel, novo_grau, "Nivel superior")
+                            pontos = pontos_superior
 
-            numero_simulacao = len(st.session_state.simulacoes) + 1
-            titulo_simulacao = f"Simulação {numero_simulacao}: {descricao_opcional}" if descricao_opcional else f"Simulação {numero_simulacao}"
-            simulacao_id = str(uuid.uuid4())
+                        df_simulado.at[idx, 'Nível'] = novo_nivel
+                        df_simulado.at[idx, 'Grau'] = novo_grau
+                        df_simulado.at[idx, 'Total_Vencimento'] = vencimento * row['Qtd']
+                        df_simulado.at[idx, 'Total_Adicional_Desempenho'] = desempenho(novo_grau, roman.toRoman(novo_nivel), upf_value, pontos) * row['Qtd']
 
-            st.session_state.simulacoes.append({
-                'titulo_simulacao': titulo_simulacao,
-                'descricao_opcional': descricao_opcional,
-                'dataframes_processados': dataframes_processados,
-                'dataframes_simulados': dataframes_simulados,
-                'simulacao_id': simulacao_id,
-                'checkbox_states': {
-                    'simular_fundamental': simular_fundamental,
-                    'simular_gestao': simular_gestao,
-                    'simular_fiscal': simular_fiscal,
-                    'simular_superior': simular_superior,
-                },
-                'upf_value': upf_value,
-                'ano_final': ano_final,
-                'pontos_medio': pontos_medio,
-                'pontos_gestao': pontos_gestao,
-                'pontos_fiscal': pontos_fiscal,
-                'pontos_superior': pontos_superior,
-                'grau_fundamental': grau_fundamental,
-                'grau_gestao': grau_gestao,
-                'grau_fiscal': grau_fiscal,
-                'grau_superior': grau_superior
-            })
+                    dataframes_simulados[nome] = df_simulado
 
-        simulacoes_para_remover = []
-        for simulacao_idx, simulacao in enumerate(st.session_state.simulacoes):
-            st.markdown(f"### {simulacao['titulo_simulacao']}")
-            st.write("#### FOLHA DE PONTO ATUAL")
-            for nome, df in simulacao['dataframes_processados'].items():
-                checkbox_states = simulacao['checkbox_states']
-                ano_atual = datetime.now().year
-                ano_final = simulacao['ano_final']
-                grau_fundamental = simulacao['grau_fundamental']
-                grau_gestao = simulacao['grau_gestao']
-                grau_fiscal = simulacao['grau_fiscal']
-                grau_superior = simulacao['grau_superior']
-                pontos_medio = simulacao['pontos_medio']
-                pontos_gestao = simulacao['pontos_gestao']
-                pontos_fiscal = simulacao['pontos_fiscal']
-                pontos_superior = simulacao['pontos_superior']
+                numero_simulacao = len(st.session_state.simulacoes) + 1
+                titulo_simulacao = f"Simulação {numero_simulacao}: {descricao_opcional}" if descricao_opcional else f"Simulação {numero_simulacao}"
+                simulacao_id = str(uuid.uuid4())
 
-                df_zerado = pd.DataFrame({
-                    'Nível': [''] * len(df),
-                    'Grau': [''] * len(df),
-                    'Venc-Unitário': [''] * len(df),
-                    'Venc-Total': [''] * len(df),
-                    'Pontos': [''] * len(df),  # Adiciona a coluna Pontos
-                    'Desemp': [''] * len(df),
-                    'Desemp-Total': [''] * len(df)
+                st.session_state.simulacoes.append({
+                    'titulo_simulacao': titulo_simulacao,
+                    'descricao_opcional': descricao_opcional,
+                    'dataframes_processados': dataframes_processados,
+                    'dataframes_simulados': dataframes_simulados,
+                    'simulacao_id': simulacao_id,
+                    'checkbox_states': {
+                        'simular_fundamental': simular_fundamental,
+                        'simular_gestao': simular_gestao,
+                        'simular_fiscal': simular_fiscal,
+                        'simular_superior': simular_superior,
+                    },
+                    'upf_value': upf_value,
+                    'ano_final': ano_final,
+                    'pontos_medio': pontos_medio,
+                    'pontos_gestao': pontos_gestao,
+                    'pontos_fiscal': pontos_fiscal,
+                    'pontos_superior': pontos_superior,
+                    'grau_fundamental': grau_fundamental,
+                    'grau_gestao': grau_gestao,
+                    'grau_fiscal': grau_fiscal,
+                    'grau_superior': grau_superior
                 })
 
-                for idx, row in df.iterrows():
-                    nivel_atual_str = row['Nível']
-                    try:
-                        nivel_atual = int(''.join(filter(str.isdigit, nivel_atual_str)))
-                    except ValueError:
-                        nivel_atual = 0
+                if 'resultado_simulacao' not in st.session_state:
+                    st.session_state.resultado_simulacao = ""
+                
+                totais_simulados = gerar_totais(dataframes_simulados, dataframes_processados, "simulados", pontos_medio, pontos_gestao, pontos_fiscal, pontos_superior, ano_final)
+                
+                # Extraindo apenas o bloco "Diferença Somada"
+                diferenca_somada_index = totais_simulados.find('<div><b>Diferença Somada:</b></div>')
+                st.session_state.resultado_simulacao = totais_simulados[diferenca_somada_index:]
 
-                    if nome == 'Nível Fundamental':
-                        novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, ano_atual, checkbox_states['simular_fundamental'], df_nivel_fundamental, nivel_atual_str, grau_fundamental == 'E', grau_fundamental == 'F')
-                        vencimento = obter_vencimento(pd.DataFrame(data_nivel_fundamental), novo_nivel, novo_grau, "Nivel fundamental")
-                        pontos = pontos_medio
-                    elif nome == 'Assistentes de Gestão':
-                        novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, ano_atual, checkbox_states['simular_gestao'], df_assistentes_gestao, nivel_atual_str, grau_gestao == 'E', grau_gestao == 'F')
-                        vencimento = obter_vencimento(pd.DataFrame(data_nivel_medio), novo_nivel, novo_grau, "Nivel medio")
-                        pontos = pontos_gestao
-                    elif nome == 'Assistentes Fiscais':
-                        novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, ano_atual, checkbox_states['simular_fiscal'], df_assistentes_fiscais, nivel_atual_str, grau_fiscal == 'E', grau_fiscal == 'F')
-                        vencimento = obter_vencimento(pd.DataFrame(data_nivel_medio), novo_nivel, novo_grau, "Nivel medio")
-                        pontos = pontos_fiscal
-                    else:
-                        novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, ano_atual, checkbox_states['simular_superior'], df_nivel_superior, nivel_atual_str, grau_superior == 'E', grau_superior == 'F')
-                        vencimento = obter_vencimento(pd.DataFrame(data_nivel_superior), novo_nivel, novo_grau, "Nivel superior")
-                        pontos = pontos_superior
+                # Exibir o resumo da simulação
+                st.markdown(f"### Diferença Somada")
+                st.markdown(st.session_state.resultado_simulacao, unsafe_allow_html=True)
 
-                    df_zerado.at[idx, 'Nível'] = novo_nivel
-                    df_zerado.at[idx, 'Grau'] = novo_grau
-                    df_zerado.at[idx, 'Venc-Unitário'] = format_currency_babel(vencimento) if vencimento != 0 else "R$ 0,00"
-
-                    qtd = row['Qtd']
-                    venc_total = vencimento * qtd
-                    df_zerado.at[idx, 'Venc-Total'] = format_currency_babel(venc_total) if venc_total != 0 else "R$ 0,00"
-
-                    # Preencher a coluna Pontos
-                    df_zerado.at[idx, 'Pontos'] = pontos
-
-                    nivel_roman = roman.toRoman(novo_nivel)
-                    valor_desempenho = desempenho(novo_grau, nivel_roman, simulacao['upf_value'], pontos)
-                    df_zerado.at[idx, 'Desemp'] = format_currency_babel(valor_desempenho) if valor_desempenho != 0 else "R$ 0,00"
-
-                    desemp_total = valor_desempenho * qtd
-                    df_zerado.at[idx, 'Desemp-Total'] = format_currency_babel(desemp_total) if desemp_total != 0 else "R$ 0,00"
-
-                with st.expander(f"{nome}"):
+        with col2:
+            with st.expander("Alterar Pontuação"):
+                with st.form(key="form_cargos"):
+                    porcentagem = st.number_input("Porcentagem", min_value=0, max_value=100, step=10, value=50, key="porcentagem")
+                    direcao = st.radio("Direção", ["Para Mais", "Para Menos"], key="direcao")
                     col1, col2 = st.columns(2)
+
                     with col1:
-                        st.dataframe(df)
+                        cargo_fundamental = st.checkbox("Nível Fundamental", value=True)
+                        cargo_gestao = st.checkbox("Assistentes de Gestão", value=True)
+                        cargo_fiscal = st.checkbox("Assistentes Fiscais", value=True)
+                        cargo_superior = st.checkbox("Nível Superior", value=True)
+                        submitted = st.form_submit_button("Confirmar")
+
+                        if submitted:
+                            ajuste = (porcentagem / 100)
+                            ajuste = ajuste if direcao == "Para Mais" else -ajuste
+
+                            if cargo_fundamental:
+                                st.session_state.novo_pontos_medio_temp = int(pontos_medio * (1 + ajuste))
+                            else:
+                                st.session_state.novo_pontos_medio_temp = pontos_medio
+
+                            if cargo_gestao:
+                                st.session_state.novo_pontos_gestao_temp = int(pontos_gestao * (1 + ajuste))
+                            else:
+                                st.session_state.novo_pontos_gestao_temp = pontos_gestao
+
+                            if cargo_fiscal:
+                                st.session_state.novo_pontos_fiscal_temp = int(pontos_fiscal * (1 + ajuste))
+                            else:
+                                st.session_state.novo_pontos_fiscal_temp = pontos_fiscal
+
+                            if cargo_superior:
+                                st.session_state.novo_pontos_superior_temp = int(pontos_superior * (1 + ajuste))
+                            else:
+                                st.session_state.novo_pontos_superior_temp = pontos_superior
+
                     with col2:
-                        st.dataframe(df_zerado)
+                        if 'novo_pontos_medio_temp' in st.session_state:
+                            st.write(f"Novo Pontos Nível Fundamental: {st.session_state.novo_pontos_medio_temp}")
+                        if 'novo_pontos_gestao_temp' in st.session_state:
+                            st.write(f"Novo Pontos Assistentes de Gestão: {st.session_state.novo_pontos_gestao_temp}")
+                        if 'novo_pontos_fiscal_temp' in st.session_state:
+                            st.write(f"Novo Pontos Assistentes Fiscais: {st.session_state.novo_pontos_fiscal_temp}")
+                        if 'novo_pontos_superior_temp' in st.session_state:
+                            st.write(f"Novo Pontos Nível Superior: {st.session_state.novo_pontos_superior_temp}")
 
-            # Exibir os totais
-            exibir_totais(simulacao)
+            st.session_state.usar_pontuacao = st.checkbox("Usar essa pontuação", value=st.session_state.usar_pontuacao)
 
-            col1, col2 = st.columns(2)
-            with col1:
-                st.write(f"Relat. gerado para a : {simulacao['titulo_simulacao']}")
+    # Atualizar os pontos armazenados com base na checkbox
+    if st.session_state.usar_pontuacao:
+        st.session_state.novo_pontos_medio = st.session_state.get("novo_pontos_medio_temp", 0)
+        st.session_state.novo_pontos_gestao = st.session_state.get("novo_pontos_gestao_temp", 0)
+        st.session_state.novo_pontos_fiscal = st.session_state.get("novo_pontos_fiscal_temp", 0)
+        st.session_state.novo_pontos_superior = st.session_state.get("novo_pontos_superior_temp", 0)
+    else:
+        st.session_state.novo_pontos_medio = 0
+        st.session_state.novo_pontos_gestao = 0
+        st.session_state.novo_pontos_fiscal = 0
+        st.session_state.novo_pontos_superior = 0
 
-            with col2:
-                if st.button(f"Excluir Simulação {simulacao['titulo_simulacao']}", key=f"excluir_{simulacao_idx}"):
-                    st.session_state.simulacoes_para_remover.append(simulacao['simulacao_id'])
+    simulacoes_para_remover = []
+    for simulacao_idx, simulacao in enumerate(st.session_state.simulacoes):
+        st.markdown(f"### {simulacao['titulo_simulacao']}")
+        st.write("#### FOLHA DE PONTO ATUAL")
+        for nome, df in simulacao['dataframes_processados'].items():
+            checkbox_states = simulacao['checkbox_states']
+            ano_atual = datetime.now().year
+            ano_final = simulacao['ano_final']
+            grau_fundamental = simulacao['grau_fundamental']
+            grau_gestao = simulacao['grau_gestao']
+            grau_fiscal = simulacao['grau_fiscal']
+            grau_superior = simulacao['grau_superior']
+            pontos_medio = simulacao['pontos_medio']
+            pontos_gestao = simulacao['pontos_gestao']
+            pontos_fiscal = simulacao['pontos_fiscal']
+            pontos_superior = simulacao['pontos_superior']
 
-        if st.session_state.simulacoes_para_remover:
-            st.session_state.simulacoes = [sim for sim in st.session_state.simulacoes if sim['simulacao_id'] not in st.session_state.simulacoes_para_remover]
-            st.session_state.simulacoes_para_remover.clear()
-            st.experimental_rerun()
+            df_zerado = pd.DataFrame({
+                'Nível': [''] * len(df),
+                'Grau': [''] * len(df),
+                'Venc-Unitário': [''] * len(df),
+                'Venc-Total': [''] * len(df),
+                'Pontos': [''] * len(df),  # Adiciona a coluna Pontos
+                'Desemp': [''] * len(df),
+                'Desemp-Total': [''] * len(df)
+            })
 
-        st.markdown("---")
+            for idx, row in df.iterrows():
+                nivel_atual_str = row['Nível']
+                try:
+                    nivel_atual = int(''.join(filter(str.isdigit, nivel_atual_str)))
+                except ValueError:
+                    nivel_atual = 0
 
+                if nome == 'Nível Fundamental':
+                    novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, ano_atual, checkbox_states['simular_fundamental'], df_nivel_fundamental, nivel_atual_str, grau_fundamental == 'E', grau_fundamental == 'F')
+                    vencimento = obter_vencimento(pd.DataFrame(data_nivel_fundamental), novo_nivel, novo_grau, "Nivel fundamental")
+                    pontos = pontos_medio
+                elif nome == 'Assistentes de Gestão':
+                    novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, ano_atual, checkbox_states['simular_gestao'], df_assistentes_gestao, nivel_atual_str, grau_gestao == 'E', grau_gestao == 'F')
+                    vencimento = obter_vencimento(pd.DataFrame(data_nivel_medio), novo_nivel, novo_grau, "Nivel medio")
+                    pontos = pontos_gestao
+                elif nome == 'Assistentes Fiscais':
+                    novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, ano_atual, checkbox_states['simular_fiscal'], df_assistentes_fiscais, nivel_atual_str, grau_fiscal == 'E', grau_fiscal == 'F')
+                    vencimento = obter_vencimento(pd.DataFrame(data_nivel_medio), novo_nivel, novo_grau, "Nivel medio")
+                    pontos = pontos_fiscal
+                else:
+                    novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, ano_atual, checkbox_states['simular_superior'], df_nivel_superior, nivel_atual_str, grau_superior == 'E', grau_superior == 'F')
+                    vencimento = obter_vencimento(pd.DataFrame(data_nivel_superior), novo_nivel, novo_grau, "Nivel superior")
+                    pontos = pontos_superior
 
+                df_zerado.at[idx, 'Nível'] = novo_nivel
+                df_zerado.at[idx, 'Grau'] = novo_grau
+                df_zerado.at[idx, 'Venc-Unitário'] = format_currency_babel(vencimento) if vencimento != 0 else "R$ 0,00"
 
+                qtd = row['Qtd']
+                venc_total = vencimento * qtd
+                df_zerado.at[idx, 'Venc-Total'] = format_currency_babel(venc_total) if venc_total != 0 else "R$ 0,00"
+
+                # Preencher a coluna Pontos
+                df_zerado.at[idx, 'Pontos'] = pontos
+
+                nivel_roman = roman.toRoman(novo_nivel)
+                valor_desempenho = desempenho(novo_grau, nivel_roman, simulacao['upf_value'], pontos)
+                df_zerado.at[idx, 'Desemp'] = format_currency_babel(valor_desempenho) if valor_desempenho != 0 else "R$ 0,00"
+
+                desemp_total = valor_desempenho * qtd
+                df_zerado.at[idx, 'Desemp-Total'] = format_currency_babel(desemp_total) if desemp_total != 0 else "R$ 0,00"
+
+            with st.expander(f"{nome}"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.dataframe(df)
+                with col2:
+                    st.dataframe(df_zerado)
+
+        # Exibir os totais
+        exibir_totais(simulacao)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write(f"Relat. gerado para a : {simulacao['titulo_simulacao']}")
+
+        with col2:
+            if st.button(f"Excluir Simulação {simulacao['titulo_simulacao']}", key=f"excluir_{simulacao_idx}"):
+                st.session_state.simulacoes_para_remover.append(simulacao['simulacao_id'])
+
+    if st.session_state.simulacoes_para_remover:
+        st.session_state.simulacoes = [sim for sim in st.session_state.simulacoes if sim['simulacao_id'] not in st.session_state.simulacoes_para_remover]
+        st.session_state.simulacoes_para_remover.clear()
+        st.experimental_rerun()
+
+    st.markdown("---")
 
 
 elif selected == "Simular PCCR por Serv.":
