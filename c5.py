@@ -7,6 +7,7 @@ from datetime import datetime
 import locale
 import roman
 import uuid
+from fpdf import FPDF
 # Configurando a localização para o Brasil
 
 from babel.numbers import format_currency
@@ -120,6 +121,27 @@ data_indice_desempenho = {
 # Convertendo os dicionários para DataFrames do pandas
 df_adic_desempenho = pd.DataFrame(data_adic_desempenho)
 df_indice_desempenho = pd.DataFrame(data_indice_desempenho)
+
+
+class PDF(FPDF):
+    def header(self):
+        self.set_font('Arial', 'B', 12)
+        self.cell(0, 10, 'Simulação de PCCR-FOLHA', 0, 1, 'C')
+
+    def footer(self):
+        self.set_y(-15)
+        self.set_font('Arial', 'I', 8)
+        self.cell(0, 10, f'Page {self.page_no()}', 0, 0, 'C')
+
+    def chapter_title(self, title):
+        self.set_font('Arial', 'B', 12)
+        self.cell(0, 10, title, 0, 1, 'L')
+        self.ln(5)
+
+    def chapter_body(self, body):
+        self.set_font('Arial', '', 12)
+        self.multi_cell(0, 6, body)  # Adjust the line height to 6
+        self.ln(3)  # Reduce space after each block
 
 def extrair_ano(data):
     try:
@@ -560,8 +582,78 @@ elif selected == "Simular PCCR-FOLHA":
             totais.append(f"<div>. Total Diferença Anual (x12): {format_currency_babel((total_diferenca_vencimento + total_diferenca_desempenho) * 12)}</div><br>")
 
         return "".join(totais)
+    
 
-    # Simulação do PCCR-FOLHA
+    def gerar_pdf(simulacao, totais_simulados):
+        pdf = PDF()
+        pdf.add_page()
+        
+        titulo_simulacao = simulacao['titulo_simulacao']
+        pdf.chapter_title(titulo_simulacao)
+
+        # Adicionando totais simulados no corpo do PDF
+        pdf.chapter_body(totais_simulados)
+
+        # Salvando PDF no buffer
+        pdf_output = f"{titulo_simulacao.replace(' ', '_')}.pdf"
+        pdf.output(pdf_output)
+        
+        return pdf_output
+        # Simulação do PCCR-FOLHA
+    def gerar_totais_pdf(simulacao):
+        totais = []
+
+        def format_currency(value):
+            return f"R$ {value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ",")
+
+        for nome, df in simulacao['dataframes_processados'].items():
+            if nome == 'Nível Fundamental':
+                pontos_value = simulacao['pontos_medio']
+            elif nome == 'Assistentes de Gestão':
+                pontos_value = simulacao['pontos_gestao']
+            elif nome == 'Assistentes Fiscais':
+                pontos_value = simulacao['pontos_fiscal']
+            elif nome == 'Cargos de Nível Superior':
+                pontos_value = simulacao['pontos_superior']
+            else:
+                pontos_value = 0
+
+            totais.append(f"{nome}:")
+            totais.append(f"  Pontos: {pontos_value} | Ano: {simulacao['ano_final']}")
+
+            total_salario_base = df['Total_Vencimento'].apply(converter_para_numero).sum()
+            total_adicional_desempenho = df['Total_Adicional_Desempenho'].apply(converter_para_numero).sum()
+
+            df_simulado = simulacao['dataframes_simulados'][nome]
+            total_salario_base_simulado = df_simulado['Total_Vencimento'].apply(converter_para_numero).sum()
+            total_adicional_desempenho_simulado = df_simulado['Total_Adicional_Desempenho'].apply(converter_para_numero).sum()
+
+            diferenca_salario_base = total_salario_base_simulado - total_salario_base
+            diferenca_adicional_desempenho = total_adicional_desempenho_simulado - total_adicional_desempenho
+
+            totais.append(f"  Total Salário Base: {format_currency(total_salario_base_simulado)} | Diferença: {format_currency(diferenca_salario_base)}")
+            totais.append(f"  Total Adicional de Desempenho: {format_currency(total_adicional_desempenho_simulado)} | Diferença: {format_currency(diferenca_adicional_desempenho)}")
+            totais.append("")
+
+        total_salario_base_geral = sum(df['Total_Vencimento'].apply(converter_para_numero).sum() for df in simulacao['dataframes_simulados'].values())
+        total_adicional_desempenho_geral = sum(df['Total_Adicional_Desempenho'].apply(converter_para_numero).sum() for df in simulacao['dataframes_simulados'].values())
+        total_diferenca_salario_base = total_salario_base_geral - sum(df['Total_Vencimento'].apply(converter_para_numero).sum() for df in simulacao['dataframes_processados'].values())
+        total_diferenca_adicional_desempenho = total_adicional_desempenho_geral - sum(df['Total_Adicional_Desempenho'].apply(converter_para_numero).sum() for df in simulacao['dataframes_processados'].values())
+
+        totais.append("Total Geral:")
+        totais.append(f"  Total Salário Base: {format_currency(total_salario_base_geral)}")
+        totais.append(f"  Total Adicional de Desempenho: {format_currency(total_adicional_desempenho_geral)}")
+        totais.append("")
+
+        totais.append("Diferença Somada:")
+        totais.append(f"  Total Diferença Salário Base: {format_currency(total_diferenca_salario_base)}")
+        totais.append(f"  Total Diferença Adicional de Desempenho: {format_currency(total_diferenca_adicional_desempenho)}")
+        totais.append(f"  Total Diferença: {format_currency(total_diferenca_salario_base + total_diferenca_adicional_desempenho)}")
+        totais.append(f"  Total Diferença Anual (x12): {format_currency((total_diferenca_salario_base + total_diferenca_adicional_desempenho) * 12)}")
+
+        return "\n".join(totais)
+
+
     try:
         df_servidores = pd.read_excel('dados_completos.xlsx')
     except Exception as e:
@@ -851,6 +943,7 @@ elif selected == "Simular PCCR-FOLHA":
         st.session_state.novo_pontos_fiscal = 0
         st.session_state.novo_pontos_superior = 0
 
+    # Atualizar a seção onde as simulações são exibidas
     simulacoes_para_remover = []
     for simulacao_idx, simulacao in enumerate(st.session_state.simulacoes):
         st.markdown(f"### {simulacao['titulo_simulacao']}")
@@ -930,7 +1023,7 @@ elif selected == "Simular PCCR-FOLHA":
         # Exibir os totais
         exibir_totais(simulacao)
 
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         with col1:
             st.write(f"Relat. gerado para a : {simulacao['titulo_simulacao']}")
 
@@ -938,14 +1031,19 @@ elif selected == "Simular PCCR-FOLHA":
             if st.button(f"Excluir Simulação {simulacao['titulo_simulacao']}", key=f"excluir_{simulacao_idx}"):
                 st.session_state.simulacoes_para_remover.append(simulacao['simulacao_id'])
 
+        with col3:
+            if st.button(f"Gerar PDF {simulacao['titulo_simulacao']}", key=f"gerar_pdf_{simulacao_idx}"):
+                totais_simulados = gerar_totais_pdf(simulacao)
+                pdf_output = gerar_pdf(simulacao, totais_simulados)
+                with open(pdf_output, "rb") as pdf_file:
+                    st.download_button(label="Download PDF", data=pdf_file, file_name=pdf_output, mime="application/pdf")
+
     if st.session_state.simulacoes_para_remover:
         st.session_state.simulacoes = [sim for sim in st.session_state.simulacoes if sim['simulacao_id'] not in st.session_state.simulacoes_para_remover]
         st.session_state.simulacoes_para_remover.clear()
         st.experimental_rerun()
 
     st.markdown("---")
-
-
 
 
 
