@@ -354,6 +354,10 @@ elif selected == "Mostrar Dados do Quadro":
         st.write("A coluna 'Cargo/Função/Emprego' não foi encontrada no dataframe.")
 
 
+
+
+
+
 elif selected == "Simular PCCR-FOLHA":
 
     # Funções auxiliares
@@ -438,17 +442,17 @@ elif selected == "Simular PCCR-FOLHA":
 
         return grau_original
 
-    def determinar_nivel(ano_final, nivel_atual, ano_atual, checkbox_state, dataframe_original, nivel_atual_str, radio_mestrado, radio_doutorado):
+    def determinar_nivel(ano_final, nivel_atual, ano_atual, checkbox_state, dataframe_original, nivel_atual_str, radio_mestrado, radio_doutorado, nivel_adicional):
         novo_grau = calcular_grau(ano_final, checkbox_state, dataframe_original, nivel_atual_str, radio_mestrado, radio_doutorado)
         
         if ano_final == ano_atual:
-            return nivel_atual, novo_grau
+            return nivel_atual + nivel_adicional, novo_grau
 
         diferenca_anos = ano_final - ano_atual
         if diferenca_anos % 2 != 0:
             diferenca_anos += 1
         niveis_adicionais = diferenca_anos // 2
-        novo_nivel = nivel_atual + niveis_adicionais
+        novo_nivel = nivel_atual + niveis_adicionais + nivel_adicional
 
         return novo_nivel, novo_grau
 
@@ -654,11 +658,13 @@ elif selected == "Simular PCCR-FOLHA":
                 grau_superior = ''
 
         # Define as colunas para os inputs do UPF e Ano Final
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         with col1:
-            upf_value = st.number_input("Valor do UPF", min_value=0.0, value=113.60)
+            upf_value = st.number_input("Valor do UPF", min_value=0.0, value=113.61)
         with col2:
             ano_final = st.number_input("Ano Final", min_value=2000, value=datetime.now().year)
+        with col3:
+            nivel_adicional = st.number_input("Adicionar Nível", min_value=0, value=0)   
 
         descricao_opcional = st.text_input("Descrição opcional")
 
@@ -702,6 +708,7 @@ elif selected == "Simular PCCR-FOLHA":
                 dataframes_simulados = {}
                 for nome, df in dataframes_processados.items():
                     df_simulado = df.copy()
+                    # Chamada da função determinar_nivel
                     for idx, row in df.iterrows():
                         nivel_atual_str = row['Nível']
                         try:
@@ -710,19 +717,19 @@ elif selected == "Simular PCCR-FOLHA":
                             nivel_atual = 0
 
                         if nome == 'Nível Fundamental':
-                            novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, datetime.now().year, simular_fundamental, df_nivel_fundamental, nivel_atual_str, grau_fundamental == 'E', grau_fundamental == 'F')
+                            novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, datetime.now().year, simular_fundamental, df_nivel_fundamental, nivel_atual_str, grau_fundamental == 'E', grau_fundamental == 'F', nivel_adicional)
                             vencimento = obter_vencimento(pd.DataFrame(data_nivel_fundamental), novo_nivel, novo_grau, "Nivel fundamental")
                             pontos = pontos_medio
                         elif nome == 'Assistentes de Gestão':
-                            novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, datetime.now().year, simular_gestao, df_assistentes_gestao, nivel_atual_str, grau_gestao == 'E', grau_gestao == 'F')
+                            novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, datetime.now().year, simular_gestao, df_assistentes_gestao, nivel_atual_str, grau_gestao == 'E', grau_gestao == 'F', nivel_adicional)
                             vencimento = obter_vencimento(pd.DataFrame(data_nivel_medio), novo_nivel, novo_grau, "Nivel medio")
                             pontos = pontos_gestao
                         elif nome == 'Assistentes Fiscais':
-                            novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, datetime.now().year, simular_fiscal, df_assistentes_fiscais, nivel_atual_str, grau_fiscal == 'E', grau_fiscal == 'F')
+                            novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, datetime.now().year, simular_fiscal, df_assistentes_fiscais, nivel_atual_str, grau_fiscal == 'E', grau_fiscal == 'F', nivel_adicional)
                             vencimento = obter_vencimento(pd.DataFrame(data_nivel_medio), novo_nivel, novo_grau, "Nivel medio")
                             pontos = pontos_fiscal
                         else:
-                            novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, datetime.now().year, simular_superior, df_nivel_superior, nivel_atual_str, grau_superior == 'E', grau_superior == 'F')
+                            novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, datetime.now().year, simular_superior, df_nivel_superior, nivel_atual_str, grau_superior == 'E', grau_superior == 'F', nivel_adicional)
                             vencimento = obter_vencimento(pd.DataFrame(data_nivel_superior), novo_nivel, novo_grau, "Nivel superior")
                             pontos = pontos_superior
 
@@ -871,19 +878,19 @@ elif selected == "Simular PCCR-FOLHA":
                     nivel_atual = 0
 
                 if nome == 'Nível Fundamental':
-                    novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, ano_atual, checkbox_states['simular_fundamental'], df_nivel_fundamental, nivel_atual_str, grau_fundamental == 'E', grau_fundamental == 'F')
+                    novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, ano_atual, checkbox_states['simular_fundamental'], df_nivel_fundamental, nivel_atual_str, grau_fundamental == 'E', grau_fundamental == 'F', nivel_adicional)
                     vencimento = obter_vencimento(pd.DataFrame(data_nivel_fundamental), novo_nivel, novo_grau, "Nivel fundamental")
                     pontos = pontos_medio
                 elif nome == 'Assistentes de Gestão':
-                    novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, ano_atual, checkbox_states['simular_gestao'], df_assistentes_gestao, nivel_atual_str, grau_gestao == 'E', grau_gestao == 'F')
+                    novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, ano_atual, checkbox_states['simular_gestao'], df_assistentes_gestao, nivel_atual_str, grau_gestao == 'E', grau_gestao == 'F', nivel_adicional)
                     vencimento = obter_vencimento(pd.DataFrame(data_nivel_medio), novo_nivel, novo_grau, "Nivel medio")
                     pontos = pontos_gestao
                 elif nome == 'Assistentes Fiscais':
-                    novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, ano_atual, checkbox_states['simular_fiscal'], df_assistentes_fiscais, nivel_atual_str, grau_fiscal == 'E', grau_fiscal == 'F')
+                    novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, ano_atual, checkbox_states['simular_fiscal'], df_assistentes_fiscais, nivel_atual_str, grau_fiscal == 'E', grau_fiscal == 'F', nivel_adicional)
                     vencimento = obter_vencimento(pd.DataFrame(data_nivel_medio), novo_nivel, novo_grau, "Nivel medio")
                     pontos = pontos_fiscal
                 else:
-                    novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, ano_atual, checkbox_states['simular_superior'], df_nivel_superior, nivel_atual_str, grau_superior == 'E', grau_superior == 'F')
+                    novo_nivel, novo_grau = determinar_nivel(ano_final, nivel_atual, ano_atual, checkbox_states['simular_superior'], df_nivel_superior, nivel_atual_str, grau_superior == 'E', grau_superior == 'F', nivel_adicional)
                     vencimento = obter_vencimento(pd.DataFrame(data_nivel_superior), novo_nivel, novo_grau, "Nivel superior")
                     pontos = pontos_superior
 
@@ -929,6 +936,20 @@ elif selected == "Simular PCCR-FOLHA":
         st.experimental_rerun()
 
     st.markdown("---")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 elif selected == "Simular PCCR por Serv.":
