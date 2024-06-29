@@ -8,6 +8,11 @@ import locale
 import roman
 import uuid
 from fpdf import FPDF
+from st_aggrid import AgGrid
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
+from st_aggrid.shared import GridUpdateMode
+from streamlit_modal import Modal
+
 # Configurando a localização para o Brasil
 
 from babel.numbers import format_currency
@@ -340,45 +345,92 @@ def mostrar_metricas_atuais():
     st.altair_chart(treemap_chart)
     st.markdown("---")
 
-
-
-
 # Chamar a função apropriada com base na seleção do menu
 if selected == "Mostrar Dados":
+  
       
-      
-       carregar_e_exibir_dados()
+    carregar_e_exibir_dados()
+
+
 
 elif selected == "Mostrar Dados do Quadro":
 
-# Função para exibir cada grupo com título
-    def display_group(group_name, group_df):
-        st.write(f"### {group_name}")
-        st.dataframe(group_df)
+    # Função para exibir os dados filtrados no AgGrid
+    def display_filtered_data(group_df, search_term):
+        if search_term:
+            filtered_group_df = group_df[group_df.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)]
+        else:
+            filtered_group_df = group_df
+        
+        gb = GridOptionsBuilder.from_dataframe(filtered_group_df)
+        gb.configure_selection('single', use_checkbox=True, groupSelectsChildren=True)
+        gb.configure_default_column(editable=True, resizable=True)
+        
+        for col in filtered_group_df.columns:
+            gb.configure_column(col, minWidth=250)
+        
+        grid_options = gb.build()
+        
+        grid_response = AgGrid(
+            filtered_group_df,
+            gridOptions=grid_options,
+            update_mode=GridUpdateMode.SELECTION_CHANGED | GridUpdateMode.MODEL_CHANGED,
+            fit_columns_on_grid_load=True
+        )
 
+        return grid_response
 
+    # Título principal
     st.title("Mostrar Dados do Quadro")
-   
-    
-    # Carregar o dataframe
-    df = pd.read_excel('dados_completos.xlsx')  # Use o caminho correto para o seu arquivo
+
+    # Botão de atualização
+    if st.button('Atualizar Dados'):
+        st.experimental_rerun()
+
+    # Carregar o dataframe (substitua pelo seu caminho correto)
+    df = pd.read_excel('dados_completos.xlsx')  
 
     # Filtrar os dados conforme especificado
     filtered_df = df[(df['Nível'].notna()) & (df['Nível'] != 'None') & (df['Nível'] != 0)]
-    
-    # Agrupando por 'Cargo/Função/Emprego' se a coluna existir
-    if 'Cargo/Função/Emprego' in filtered_df.columns:
-        grouped_by_cargo = filtered_df.groupby('Cargo/Função/Emprego')
-        st.subheader("Agrupado por Cargo/Função/Emprego")
-        for cargo, group in grouped_by_cargo:
-            display_group(cargo, group)
+
+    # Obter lista única de cargos/funções/empregos
+    cargos = filtered_df['Cargo/Função/Emprego'].unique()
+
+    # Radio buttons para seleção de cargo
+    selected_cargo = st.radio("Selecionar Cargo/Função/Emprego:", cargos)
+
+    # Campo de pesquisa
+    search_term = st.text_input(f"Pesquisar em {selected_cargo}", key=f"{selected_cargo}_search")
+
+    # Filtrar dados pelo cargo selecionado
+    filtered_group_df = filtered_df[filtered_df['Cargo/Função/Emprego'] == selected_cargo]
+
+    # Exibir dados filtrados no AgGrid
+    grid_response = display_filtered_data(filtered_group_df, search_term)
+
+    # Capturar as linhas selecionadas
+    selected_rows = grid_response.get('selected_rows', [])
+
+    # Exibir dados selecionados automaticamente
+    if selected_rows is not None and len(selected_rows) > 0:
+        selected_df = pd.DataFrame(selected_rows)
+        
+        # Filtrar para remover colunas com valores 0 ou nulos na linha selecionada
+        selected_df = selected_df.loc[:, (selected_df != 0).any(axis=0)]
+        selected_df = selected_df.dropna(axis=1, how='all')
+
+        # Mostrar cabeçalho e linha selecionada em duas colunas formatadas como uma tabela
+        if not selected_df.empty:
+            selected_header = list(selected_df.columns)
+            selected_data = selected_df.iloc[0].tolist()  # Exibindo apenas a primeira linha selecionada
+
+            table_data = list(zip(selected_header, selected_data))
+            table_df = pd.DataFrame(table_data, columns=["Descrição", "Dados"])
+            
+            st.write("**Dados Selecionados:**")
+            st.write(table_df.to_html(index=False), unsafe_allow_html=True)
     else:
-        st.write("A coluna 'Cargo/Função/Emprego' não foi encontrada no dataframe.")
-
-
-
-
-
+        st.write("Nenhum dado selecionado.")
 
 elif selected == "Simular PCCR-FOLHA":
 
