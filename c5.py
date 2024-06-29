@@ -11,7 +11,7 @@ from fpdf import FPDF
 from st_aggrid import AgGrid
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
 from st_aggrid.shared import GridUpdateMode
-from streamlit_modal import Modal
+
 
 # Configurando a localização para o Brasil
 
