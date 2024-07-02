@@ -61,12 +61,11 @@ st.write("Dados baixados do último post do portal da transparência para a IDAR
 with st.sidebar:
     selected = option_menu(
         menu_title="PCCR IDARON",  # required
-        options=["Métricas atuais", "Simular PCCR por Serv.", "Simular PCCR-FOLHA", "Mostrar Dados do Quadro", "Mostrar Dados", "Tabelas"],  # required
-        icons=["bar-chart", "calculator", "file-earmark-text", "clipboard-data", "table", "grid"], 
+        options=["Métricas atuais", "Simular PCCR por Serv.", "Simular PCCR-FOLHA", "Mostrar Dados do Quadro", "Mostrar Dados", "Avaliar Dados", "Tabelas"],  # required
+        icons=["bar-chart", "calculator", "file-earmark-text", "clipboard-data", "table", "clipboard-check", "grid"],  # updated with icon for "Avaliar Dados"
         menu_icon="cast",  # optional: icon for the menu
         default_index=0,  # optional: default index
     )
-
 #Dataframes niveis    
 data_nivel_superior = {
     "NIVEL": ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX"],
@@ -433,7 +432,7 @@ elif selected == "Mostrar Dados do Quadro":
         st.write("Nenhum dado selecionado.")
 
 elif selected == "Simular PCCR-FOLHA":
-
+    st.title("Simular PCCR-FOLHA")
     # Funções auxiliares
     def converter_para_numero(valor):
         if isinstance(valor, str):
@@ -753,7 +752,7 @@ elif selected == "Simular PCCR-FOLHA":
         pontos_gestao_input = 500
         pontos_fiscal_input = 1700
         pontos_superior_input = 3900
-
+        st.markdown("---")
         # Define as colunas para os inputs
         col1, col2, col3, col4 = st.columns(4)
 
@@ -808,7 +807,7 @@ elif selected == "Simular PCCR-FOLHA":
                 grau_superior = 'E' if tipo_salario_superior == 'MESTRADO' else 'F'
             else:
                 grau_superior = ''
-
+        st.markdown("---")
         # Define as colunas para os inputs do UPF e Ano Final
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -1099,17 +1098,6 @@ elif selected == "Simular PCCR-FOLHA":
 
 
 
-
-
-
-
-
-
-
-
-
-
-
 elif selected == "Simular PCCR por Serv.":
     st.title("Simular PCCR por Servidor.")
     col1, col2, col3, col4 = st.columns(4)
@@ -1235,12 +1223,187 @@ elif selected == "Simular PCCR por Serv.":
                 st.experimental_rerun()
             st.markdown("---")
 
-
-
-
-
 elif selected == "Métricas atuais":
     mostrar_metricas_atuais()
+
+
+elif selected == "Avaliar Dados":
+    st.title("Avaliar Dados Baixados")
+    def encontrar_divergencias(df_original, df_calculado):
+        divergencias = df_original.copy()
+        divergencias['Niv'] = df_calculado['Niv']
+        divergencias['Grau'] = df_calculado['Grau']
+        divergencias['Vencimento Calculado'] = df_calculado['Vencimento']
+        divergencias['Desempenho Calculado'] = df_calculado['Desempenho']
+        divergencias = divergencias[
+            (divergencias['VENCIMENTO'] != divergencias['Vencimento Calculado']) | 
+            (divergencias['Idaron - Adicional de Desempenho'] != divergencias['Desempenho Calculado'])
+        ]
+        return divergencias
+
+    def obter_vencimento(dataframe_vencimentos, nivel, grau, nivel_educacao):
+        cursos = {
+            "A": "FORMAÇÃO REQUISITO PARA INGRESSO",
+            "B": "CAPACITAÇÃO",
+            "C": "GRADUAÇÃO" if nivel_educacao != "Nivel superior" else "ESPECIALIZAÇÃO",
+            "D": "ESPECIALIZAÇÃO" if nivel_educacao != "Nivel superior" else "GRADUAÇÃO POSTERIOR RELACIONADA ÁS ATRIBUIÇÕES DO CARGO",
+            "E": "MESTRADO",
+            "F": "DOUTORADO"
+        }
+        
+        curso = cursos.get(grau)
+        if curso not in dataframe_vencimentos.columns:
+            return 0.0
+        
+        vencimento = dataframe_vencimentos.loc[dataframe_vencimentos['NIVEL'] == roman.toRoman(nivel), curso].values
+        if len(vencimento) > 0:
+            return vencimento[0]
+        return 0.0
+
+    def format_currency_babel(valor):
+        return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+    def desempenho(grau, nivel_roman, upf_value, pontos):
+        valor_adic_desempenho = df_adic_desempenho.loc[df_adic_desempenho['GRAU'] == grau, 'VALOR DO PONTO DO ADIC DE DESEMPENHO'].values[0]
+        indice_desempenho = df_indice_desempenho.loc[df_indice_desempenho['NIVEL'] == nivel_roman, 'ÍNDICE DE ADICIONAL DE DESEMPENHO'].values[0]
+        valor_desempenho = upf_value * valor_adic_desempenho * indice_desempenho * pontos
+        return valor_desempenho
+    
+
+    def render_table_if_not_empty(df, colunas_desejadas, title):
+        if not df.empty:
+            st.write(title)
+            html = df[colunas_desejadas].to_html(index=False, classes='table table-striped')
+            st.write(html, unsafe_allow_html=True)
+            st.markdown("<br>", unsafe_allow_html=True) 
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+
+    try:
+        df_servidores = pd.read_excel('dados_completos.xlsx')
+    except Exception as e:
+        st.error(f"Erro ao carregar o arquivo: {e}")
+    else:
+
+        df_filtrado = df_servidores[df_servidores['Nível'].notna() & (df_servidores['Nível'] != 0)]
+        df_filtrado['Ano'] = df_filtrado['Data de admissão'].apply(lambda x: pd.to_datetime(x).year)
+        df_filtrado['Ano'] = df_filtrado['Ano'].astype(str)
+
+        cargos_fundamental = ['Idaron - Agente de Transporte Fluvial', 'Idaron - Agente de Dilig. e Transporte', 'Idaron - Aux.de Serv. de Def. Agrosilv.']
+        cargo_gestao = 'Idaron - Assist. de Gest. da Def. Agrop.'
+        cargo_fiscal = 'Idaron - Assist. Estad. de Fisc. Agrop.'
+
+        df_nivel_fundamental = df_filtrado[df_filtrado['Cargo/Função/Emprego'].isin(cargos_fundamental)]
+        df_assistentes_gestao = df_filtrado[df_filtrado['Cargo/Função/Emprego'] == cargo_gestao]
+        df_assistentes_fiscais = df_filtrado[df_filtrado['Cargo/Função/Emprego'] == cargo_fiscal]
+        df_nivel_superior = df_filtrado[~df_filtrado['Cargo/Função/Emprego'].isin(cargos_fundamental + [cargo_gestao, cargo_fiscal])]
+
+        colunas_desejadas = [
+            'Nome do Servidor', 'VENCIMENTO', 'Idaron - Adicional de Desempenho', 'Nível'
+        ]
+
+        pontos_medio_input = 300
+        pontos_gestao_input = 500
+        pontos_fiscal_input = 1700
+        pontos_superior_input = 3900
+        # Criar quatro colunas com os inputs de pontos e UPF
+        col1, col2, col3, col4, col5 = st.columns(5)
+
+        with col1:
+            pontos_medio = st.number_input("Pontos Nível Fundamental", min_value=0, step=1, value=pontos_medio_input, key="pontos_medio", format="%d")
+
+        with col2:
+            pontos_gestao = st.number_input("Pontos Assistentes de Gestão", min_value=0, step=1, value=pontos_gestao_input, key="pontos_gestao", format="%d")
+
+        with col3:
+            pontos_fiscal = st.number_input("Pontos Assistentes Fiscais", min_value=0, step=1, value=pontos_fiscal_input, key="pontos_fiscal", format="%d")
+
+        with col4:
+            pontos_superior = st.number_input("Pontos Cargos de Nível Superior", min_value=0, step=1, value=pontos_superior_input, key="pontos_superior", format="%d")
+
+        with col5:
+            upf = st.number_input("UPF", value=113.61)
+
+        # Função para calcular vencimento e desempenho e processar o dataframe
+        def calcular_vencimento_desempenho(dataframe, tabela_vencimentos, nivel_educacao, pontos, upf):
+            dataframe['Niv'] = dataframe['Nível'].str.extract('(\d+)').astype(int)
+            dataframe['Grau'] = dataframe['Nível'].str.extract('([A-Za-z]+)')
+            dataframe['Vencimento'] = dataframe.apply(lambda row: obter_vencimento(tabela_vencimentos, row['Niv'], row['Grau'], nivel_educacao), axis=1)
+            dataframe['Desempenho'] = dataframe.apply(lambda row: desempenho(row['Grau'], roman.toRoman(row['Niv']), upf, pontos), axis=1)
+            dataframe['Vencimento'] = dataframe['Vencimento'].apply(format_currency_babel)
+            dataframe['Desempenho'] = dataframe['Desempenho'].apply(format_currency_babel)
+            return dataframe[['Niv', 'Grau', 'Vencimento', 'Desempenho']]
+
+        # Tabelas de vencimentos
+        tabela_vencimentos_superior = pd.DataFrame(data_nivel_superior)
+        tabela_vencimentos_medio = pd.DataFrame(data_nivel_medio)
+        tabela_vencimentos_fundamental = pd.DataFrame(data_nivel_fundamental)
+
+        # Exibir os dados filtrados nos expansores
+        with st.expander("Servidores de Nível Fundamental"):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.dataframe(df_nivel_fundamental[colunas_desejadas])
+            with col2:
+                df_fundamental_vencimento = calcular_vencimento_desempenho(df_nivel_fundamental.copy(), tabela_vencimentos_fundamental, "Nivel medio", pontos_medio, upf)
+                st.dataframe(df_fundamental_vencimento)
+
+        with st.expander("Assistentes de Gestão"):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.dataframe(df_assistentes_gestao[colunas_desejadas])
+            with col2:
+                df_gestao_vencimento = calcular_vencimento_desempenho(df_assistentes_gestao.copy(), tabela_vencimentos_medio, "Nivel medio", pontos_gestao, upf)
+                st.dataframe(df_gestao_vencimento)
+
+        with st.expander("Assistentes Fiscais"):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.dataframe(df_assistentes_fiscais[colunas_desejadas])
+            with col2:
+                df_fiscais_vencimento = calcular_vencimento_desempenho(df_assistentes_fiscais.copy(), tabela_vencimentos_medio, "Nivel medio", pontos_fiscal, upf)
+                st.dataframe(df_fiscais_vencimento)
+
+        with st.expander("Cargos de Nível Superior"):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.dataframe(df_nivel_superior[colunas_desejadas])
+            with col2:
+                df_superior_vencimento = calcular_vencimento_desempenho(df_nivel_superior.copy(), tabela_vencimentos_superior, "Nivel superior", pontos_superior, upf)
+                st.dataframe(df_superior_vencimento)
+
+        st.markdown("---")
+        st.write("Divergências")
+
+        # Encontrar e exibir divergências
+        colunas_desejadas_divergencias = [
+            'Nome do Servidor', 'Nível', 'Niv', 'Grau', 'VENCIMENTO', 'Idaron - Adicional de Desempenho', 'Vencimento Calculado', 'Desempenho Calculado'
+        ]
+
+        # Divergências Nível Fundamental
+        divergencias_fundamental = encontrar_divergencias(df_nivel_fundamental, df_fundamental_vencimento)
+        render_table_if_not_empty(divergencias_fundamental, colunas_desejadas_divergencias, "Divergências Nível Fundamental")
+
+        # Divergências Assistentes de Gestão
+        divergencias_gestao = encontrar_divergencias(df_assistentes_gestao, df_gestao_vencimento)
+        render_table_if_not_empty(divergencias_gestao, colunas_desejadas_divergencias, "Divergências Assistentes de Gestão")
+
+        # Divergências Assistentes Fiscais
+        divergencias_fiscais = encontrar_divergencias(df_assistentes_fiscais, df_fiscais_vencimento)
+        render_table_if_not_empty(divergencias_fiscais, colunas_desejadas_divergencias, "Divergências Assistentes Fiscais")
+
+        # Divergências Cargos de Nível Superior
+        divergencias_superior = encontrar_divergencias(df_nivel_superior, df_superior_vencimento)
+        render_table_if_not_empty(divergencias_superior, colunas_desejadas_divergencias, "Divergências Cargos de Nível Superior")
+
+
+
+
+
+
+
+
+
  
 elif selected == "Tabelas":
     df_nivel_superior = pd.DataFrame(data_nivel_superior)
