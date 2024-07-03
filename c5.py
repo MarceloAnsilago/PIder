@@ -211,7 +211,6 @@ def converter_para_numero(valor):
         return valor
 
 
-# Função para exibir métricas atuais
 def mostrar_metricas_atuais():
     # Carregar a planilha de dados
     df = pd.read_excel('dados_completos.xlsx')
@@ -249,7 +248,8 @@ def mostrar_metricas_atuais():
 
     # Filtrar os dados para o grupo "Efetivo do quadro"
     df_efetivo_quadro = df_ativo_efetivo[df_ativo_efetivo['Cargo/Função/Emprego'].isin(cargos_efetivo_quadro)]
-    # df_ativo_efetivo_restante = df_ativo_efetivo[~df_ativo_efetivo['Cargo/Função/Emprego'].isin(cargos_efetivo_quadro)]
+    total_salario_efetivo_quadro = df_efetivo_quadro['Total (Salário bruto)'].sum()
+    total_salario_efetivo_quadro_anual = total_salario_efetivo_quadro * 12
 
     # Função para exibir métricas em colunas
     def exibir_metricas(df, total_salario_bruto):
@@ -259,30 +259,49 @@ def mostrar_metricas_atuais():
         ).reset_index()
         agrupado_por_cargo['Porcentagem'] = (agrupado_por_cargo['total_salario_bruto'] / total_salario_bruto) * 100
         agrupado_por_cargo['total_salario_bruto'] = agrupado_por_cargo['total_salario_bruto'].apply(lambda x: f'R$ {x:,.2f}')
+        agrupado_por_cargo = agrupado_por_cargo.sort_values(by='total_salario_bruto', ascending=False)
 
         # Criar colunas para exibir as métricas
-        cols = st.columns(5)
+        colunas_por_linha = 5
         col_index = 0
 
         # Exibir as métricas para cada cargo
         for index, row in agrupado_por_cargo.iterrows():
-            with cols[col_index]:
+            if col_index % colunas_por_linha == 0:
+                cols = st.columns(colunas_por_linha)
+            with cols[col_index % colunas_por_linha]:
                 st.metric(
                     label=f"{row['Cargo/Função/Emprego']}",
                     value=row['total_salario_bruto'],
                     delta=f"{row['Porcentagem']:.2f}% - {row['num_servidores']} servidores"
                 )
-            col_index = (col_index + 1) % 5
+            col_index += 1
 
     # Exibir métricas para "Efetivo do quadro"
     st.subheader("Efetivo do quadro")
+    st.metric(
+        label="Total da folha do quadro",
+        value=f"R$ {total_salario_efetivo_quadro:,.2f}",
+        delta=f"Anual (x 12): R$ {total_salario_efetivo_quadro_anual:,.2f}",
+        delta_color="off"
+    )
     exibir_metricas(df_efetivo_quadro, total_salario_bruto)
 
     # Separador
     st.markdown("---")
 
+    # Calcular o total do salário bruto para "Outros servidores"
+    total_salario_outros = df_outros['Total (Salário bruto)'].sum()
+    total_salario_outros_anual = total_salario_outros * 12
+
     # Exibir métricas para "Outros servidores"
     st.subheader("Outros servidores")
+    st.metric(
+        label="Total da folha de outros servidores",
+        value=f"R$ {total_salario_outros:,.2f}",
+        delta=f"Anual (x 12): R$ {total_salario_outros_anual:,.2f}",
+        delta_color="off"
+    )
     exibir_metricas(df_outros, total_salario_bruto)
 
     # Separador
@@ -301,7 +320,7 @@ def mostrar_metricas_atuais():
     with col1:
         st.write("Dados agrupados por cargo:", agrupado_por_cargo)
     with col2:
-    # Criar o gráfico de barras com Altair
+        # Criar o gráfico de barras com Altair
         chart_barras = alt.Chart(agrupado_por_cargo).mark_bar(color='red').encode(
             x=alt.X('Total (Salário bruto):Q', title='Total (Salário bruto)'),
             y=alt.Y('Cargo/Função/Emprego:N', sort='-x', title='Cargo/Função/Emprego'),
@@ -323,8 +342,8 @@ def mostrar_metricas_atuais():
     st.markdown("---")
 
     agrupado_por_cargo = df.groupby('Cargo/Função/Emprego').agg(
-    total_salario_bruto=('Total (Salário bruto)', 'sum'),
-    num_servidores=('Total (Salário bruto)', 'count')
+        total_salario_bruto=('Total (Salário bruto)', 'sum'),
+        num_servidores=('Total (Salário bruto)', 'count')
     ).reset_index()
 
     agrupado_por_cargo['Custo por Servidor'] = agrupado_por_cargo['total_salario_bruto'] / agrupado_por_cargo['num_servidores']
@@ -344,12 +363,44 @@ def mostrar_metricas_atuais():
     st.altair_chart(treemap_chart)
     st.markdown("---")
 
+# Gráficos de Pizza - Quantidade de Servidores e Salários
+    st.subheader("Comparação de Servidores e Salários por Grupo")
+
+    # Dados para o gráfico de quantidade de servidores
+    qtd_servidores = [df_efetivo_quadro.shape[0], df_outros.shape[0]]
+    labels_servidores = ['Efetivo do Quadro', 'Outros Servidores']
+
+    # Dados para o gráfico de salários
+    salarios_servidores = [total_salario_efetivo_quadro, total_salario_outros]
+    labels_salarios = ['Efetivo do Quadro', 'Outros Servidores']
+
+    # Configurar colunas
+    col1, col2 = st.columns(2)
+
+    # Gráfico de Pizza - Quantidade de Servidores
+    with col1:
+        st.markdown("### Participação no número de contingente")
+        fig1, ax1 = plt.subplots(figsize=(5.5, 5.5))
+        ax1.pie(qtd_servidores, labels=labels_servidores, autopct='%1.1f%%', startangle=90)
+        ax1.axis('equal')
+        st.pyplot(fig1)
+
+    # Gráfico de Pizza - Salários
+    with col2:
+        st.markdown("### Participação na folha de pagamento")
+        fig2, ax2 = plt.subplots(figsize=(2.9, 3))
+        ax2.pie(salarios_servidores, labels=labels_salarios, autopct='%1.1f%%', startangle=90)
+        ax2.axis('equal')
+        st.pyplot(fig2)
+
+    st.markdown("---")     
+
+
 # Chamar a função apropriada com base na seleção do menu
 if selected == "Mostrar Dados":
   
       
     carregar_e_exibir_dados()
-
 
 
 elif selected == "Mostrar Dados do Quadro":
@@ -1397,14 +1448,6 @@ elif selected == "Avaliar Dados":
         render_table_if_not_empty(divergencias_superior, colunas_desejadas_divergencias, "Divergências Cargos de Nível Superior")
 
 
-
-
-
-
-
-
-
- 
 elif selected == "Tabelas":
     df_nivel_superior = pd.DataFrame(data_nivel_superior)
     html_table = df_nivel_superior.to_html(index=False)
