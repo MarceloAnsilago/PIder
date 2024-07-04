@@ -393,7 +393,89 @@ def mostrar_metricas_atuais():
         ax2.axis('equal')
         st.pyplot(fig2)
 
-    st.markdown("---")     
+ # Adicionar o separador
+ 
+    st.markdown("---")
+
+ # Remover o símbolo de moeda e converter para float na coluna 'Total (Salário bruto)'
+    df['Total (Salário bruto)'] = df['Total (Salário bruto)'].replace({'R\$': '', '\.': '', ',': '.'}, regex=True)
+    df['Total (Salário bruto)'] = pd.to_numeric(df['Total (Salário bruto)'], errors='coerce')
+
+    # Calcular o total do salário bruto
+    total_salario_bruto = df['Total (Salário bruto)'].sum()
+
+    # Somar os valores das colunas especificadas
+    colunas_representacao = [
+        'REPRESENTACAO CDS-01',
+        'REPRESENTACAO CDS-03',
+        'REPRESENTACAO CDS-04',
+        'REPRESENTACAO CDS-05',
+        'REPRESENTACAO CDS-06',
+        'REPRESENTACAO CDS-10',
+        'REPRESENTACAO CDS-12',
+        'REPRESENTACAO CDS-17'
+    ]
+
+    # Remover o símbolo de moeda e converter para float nas colunas de representação
+    df[colunas_representacao] = df[colunas_representacao].replace({'R\$': '', '\.': '', ',': '.'}, regex=True)
+    df[colunas_representacao] = df[colunas_representacao].apply(pd.to_numeric, errors='coerce')
+
+    # Calcular a soma dos valores das colunas de representação
+    soma_representacao = df[colunas_representacao].sum()
+
+    # Calcular a soma total das colunas de representação
+    soma_total_representacao = soma_representacao.sum()
+
+    # Calcular a diferença para representar outros custos
+    outros_custos = total_salario_bruto - soma_total_representacao
+
+    # Dados para o gráfico de rosca principal
+    labels = colunas_representacao + ['Outros Custos']
+    sizes = soma_representacao.tolist() + [outros_custos]
+
+    # Gráfico de rosca principal
+    fig_principal, ax_principal = plt.subplots(figsize=(5, 5))
+    wedges_principal, texts_principal, autotexts_principal = ax_principal.pie(sizes, autopct='%1.1f%%', startangle=90, wedgeprops=dict(width=0.3), textprops=dict(color="black"))
+
+    ax_principal.legend(wedges_principal, labels, title="Categorias", loc="center left", bbox_to_anchor=(1, 0, 0.5, 1), fontsize='small')
+    plt.setp(autotexts_principal, size=6, weight="bold")
+    ax_principal.set_title('Distribuição dos Custos de Representação em Relação ao Custo Total da Folha')
+
+    # Mostrar o gráfico principal na primeira coluna
+    col1, col2 = st.columns([2, 3])
+    with col1:
+        st.pyplot(fig_principal)
+
+    # Gráficos de rosca individuais para cada representação CDS
+    fig_list = []
+    qtd_servidores_list = []
+    for coluna in colunas_representacao:
+        fig, ax = plt.subplots(figsize=(2, 2))
+        sizes_cds = [df[coluna].sum(), soma_total_representacao - df[coluna].sum()]
+        labels_cds = [f'{coluna}', 'Outros Representações']
+        wedges, texts, autotexts = ax.pie(sizes_cds, autopct='%1.1f%%', startangle=90, wedgeprops=dict(width=0.3), textprops=dict(color="black"))
+        plt.setp(autotexts, size=6, weight="bold")
+        ax.set_title(f'{coluna}')
+        fig_list.append(fig)
+        qtd_servidores_list.append(df[coluna].apply(pd.to_numeric, errors='coerce').count())
+
+    # Exibir os gráficos de rosca individuais em duas linhas com quatro colunas
+    col3, col4, col5, col6 = st.columns(4)
+    for i in range(4):
+        with col3 if i == 0 else col4 if i == 1 else col5 if i == 2 else col6:
+            st.pyplot(fig_list[i])
+            st.markdown(f"<p style='text-align: center;'>Servidores: {qtd_servidores_list[i]}</p>", unsafe_allow_html=True)
+
+    col7, col8, col9, col10 = st.columns(4)
+    for i in range(4, 8):
+        with col7 if i == 4 else col8 if i == 5 else col9 if i == 6 else col10:
+            st.pyplot(fig_list[i])
+            st.markdown(f"<p style='text-align: center;'>Servidores: {qtd_servidores_list[i]}</p>", unsafe_allow_html=True)
+
+
+
+
+
 
 
 # Chamar a função apropriada com base na seleção do menu
